@@ -1,0 +1,451 @@
+{
+  "users": [
+    {
+      "id": "u1",
+      "phone": "254712345678",
+      "username": "MwangiEscrow",
+      "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
+      "trustScore": 96,
+      "contractsCompleted": 24,
+      "winStreak": 4,
+      "walletBalance": 4500
+    },
+    {
+      "id": "u2",
+      "phone": "254723456789",
+      "username": "Mwende_Vibe",
+      "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150",
+      "trustScore": 95,
+      "contractsCompleted": 18,
+      "winStreak": 2,
+      "walletBalance": 7800
+    },
+    {
+      "id": "u3",
+      "phone": "254734567890",
+      "username": "Achieng_Dev",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150",
+      "trustScore": 89,
+      "contractsCompleted": 9,
+      "winStreak": 0,
+      "walletBalance": 1200
+    },
+    {
+      "id": "u4",
+      "phone": "254745678901",
+      "username": "Kip_Runner",
+      "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150",
+      "trustScore": 99,
+      "contractsCompleted": 35,
+      "winStreak": 6,
+      "walletBalance": 15000
+    },
+    {
+      "id": "admin",
+      "phone": "254700000000",
+      "username": "WekeleaAdmin",
+      "avatar": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150",
+      "trustScore": 100,
+      "contractsCompleted": 0,
+      "winStreak": 0,
+      "walletBalance": 100000
+    },
+    {
+      "id": "u_gqonwdfj",
+      "phone": "254706266310",
+      "username": "User_6310",
+      "avatar": "https://api.dicebear.com/7.x/bottts/svg?seed=User_6310",
+      "trustScore": 88,
+      "contractsCompleted": 0,
+      "winStreak": 0,
+      "walletBalance": 0
+    }
+  ],
+  "contracts": [
+    {
+      "id": "c1",
+      "title": "Arsenal beats Manchester United",
+      "category": "Sports",
+      "terms": "Arsenal FC must win the Premier League match against Manchester United FC on May 28, 2026, as verified by official Premier League results. If it ends in a draw, stakes are refunded.",
+      "termsList": [
+        "Arsenal FC must win the match against Manchester United FC on May 28, 2026.",
+        "Verified by official Premier League results page.",
+        "Refund stakes if match ends in a draw."
+      ],
+      "stakeAmount": 1000,
+      "totalPot": 2000,
+      "creatorId": "u1",
+      "counterpartyId": "u2",
+      "creatorStatus": "FUNDED",
+      "counterpartyStatus": "FUNDED",
+      "status": "ACTIVE",
+      "eventDate": "2026-05-28T18:00:00Z",
+      "settlementDeadline": "2026-05-29T18:00:00Z",
+      "expirationDate": "2026-05-28T17:00:00Z",
+      "trustedSource": "https://www.premierleague.com",
+      "trashTalk": "Prepare to lose those shillings, Mwende! Gunners all the way.",
+      "privacy": "Private",
+      "createdAt": "2026-05-25T10:00:00Z",
+      "updatedAt": "2026-05-25T10:15:00Z"
+    },
+    {
+      "id": "c2",
+      "title": "Bitcoin exceeds $72,000 on June 1",
+      "category": "Crypto",
+      "terms": "Bitcoin (BTC/USD) closing price on Binance on June 1, 2026, must be strictly greater than $72,000.00 USD. Verification via CoinMarketCap.",
+      "termsList": [
+        "Bitcoin (BTC/USD) Binance closing price strictly greater than $72,000.00 USD on June 1, 2026.",
+        "Verified by CoinMarketCap charts."
+      ],
+      "stakeAmount": 2500,
+      "totalPot": 5000,
+      "creatorId": "u4",
+      "counterpartyId": "u1",
+      "creatorStatus": "FUNDED",
+      "counterpartyStatus": "PENDING_FUND",
+      "status": "AWAITING_FUNDING",
+      "eventDate": "2026-06-01T23:59:59Z",
+      "settlementDeadline": "2026-06-02T23:59:59Z",
+      "expirationDate": "2026-05-31T23:59:59Z",
+      "trustedSource": "https://coinmarketcap.com/currencies/bitcoin/",
+      "trashTalk": "Crypto bull market is back, Mwangi!",
+      "privacy": "Private",
+      "createdAt": "2026-05-26T08:00:00Z",
+      "updatedAt": "2026-05-26T08:05:00Z"
+    },
+    {
+      "id": "c3",
+      "title": "Kendrick drops new album before June 15",
+      "category": "Entertainment",
+      "terms": "Kendrick Lamar must officially release a full-length studio album on major streaming services (Spotify/Apple Music) between May 26, 2026, and June 15, 2026 (East African Time). Verified by Billboard.",
+      "termsList": [
+        "Kendrick Lamar releases a full-length studio album between May 26 and June 15, 2026.",
+        "Album available on Spotify and Apple Music.",
+        "Verified by Billboard official chart announcements."
+      ],
+      "stakeAmount": 500,
+      "totalPot": 1000,
+      "creatorId": "u2",
+      "counterpartyId": "u3",
+      "creatorStatus": "FUNDED",
+      "counterpartyStatus": "FUNDED",
+      "status": "CLAIMED",
+      "eventDate": "2026-06-15T00:00:00Z",
+      "settlementDeadline": "2026-06-16T00:00:00Z",
+      "expirationDate": "2026-06-01T00:00:00Z",
+      "trustedSource": "https://www.billboard.com",
+      "trashTalk": "He was in the studio, Achieng. He is ready to drop!",
+      "privacy": "Private",
+      "winnerId": "u2",
+      "claimedById": "u2",
+      "createdAt": "2026-05-24T12:00:00Z",
+      "updatedAt": "2026-05-26T09:00:00Z"
+    },
+    {
+      "id": "c4",
+      "title": "Codename X completes in under 2 hours",
+      "category": "Gaming",
+      "terms": "Achieng stream speedrun of Codename X must clock strictly under 2 hours 0 minutes 0 seconds as timed by the game overlay on her Twitch stream. Twitch clip required.",
+      "termsList": [
+        "Twitch speedrun timer clocks strictly under 2 hours 0 minutes 0 seconds.",
+        "Twitch clips uploaded and shared on steam feed.",
+        "Conditions verified on speedrun overlays."
+      ],
+      "stakeAmount": 1500,
+      "totalPot": 3000,
+      "creatorId": "u3",
+      "counterpartyId": "u4",
+      "creatorStatus": "FUNDED",
+      "counterpartyStatus": "FUNDED",
+      "status": "DISPUTED",
+      "eventDate": "2026-05-25T20:00:00Z",
+      "settlementDeadline": "2026-05-26T20:00:00Z",
+      "expirationDate": "2026-05-25T19:00:00Z",
+      "trashTalk": "I have been practicing. You are funding my dinner tonight.",
+      "privacy": "Private",
+      "claimedById": "u3",
+      "disputeId": "d1",
+      "createdAt": "2026-05-25T14:00:00Z",
+      "updatedAt": "2026-05-26T06:00:00Z"
+    },
+    {
+      "id": "c_flc5t67d",
+      "title": "Ruto wins",
+      "category": "Sports",
+      "terms": "William Ruto wins 2027 kenya election as president.",
+      "termsList": [
+        "William Ruto wins 2027 kenya election as president."
+      ],
+      "stakeAmount": 1000,
+      "totalPot": 2000,
+      "creatorId": "u_gqonwdfj",
+      "counterpartyId": "u1",
+      "creatorStatus": "FUNDED",
+      "counterpartyStatus": "FUNDED",
+      "status": "DISPUTED",
+      "eventDate": "2026-05-28T09:55:36.781Z",
+      "settlementDeadline": "2026-05-29T09:55:36.781Z",
+      "expirationDate": "2026-05-28T08:55:36.781Z",
+      "trashTalk": "utaona tu",
+      "privacy": "Private",
+      "createdAt": "2026-05-26T09:55:36.791Z",
+      "updatedAt": "2026-05-26T09:58:03.050Z",
+      "claimedById": "u_gqonwdfj",
+      "winnerId": "u_gqonwdfj",
+      "disputeId": "d_u440lmg7ux"
+    }
+  ],
+  "escrowLedgers": [],
+  "auditLogs": [
+    {
+      "id": "log_y2ugjiy5ch",
+      "contractId": "c_flc5t67d",
+      "userId": "u1",
+      "action": "DISPUTE_OPENED",
+      "details": "Dispute d_u440lmg7ux opened by MwangiEscrow. Escrow frozen. Reason: he hasnt won, election date hasnt passed",
+      "timestamp": "2026-05-26T09:58:03.051Z"
+    },
+    {
+      "id": "log_e26bbmwbpk",
+      "contractId": "c_flc5t67d",
+      "userId": "u_gqonwdfj",
+      "action": "WIN_CLAIMED",
+      "details": "User_6310 claimed win. Opponent MwangiEscrow notification triggered.",
+      "timestamp": "2026-05-26T09:56:44.890Z"
+    },
+    {
+      "id": "log_idgx5o5vgv",
+      "contractId": "c_flc5t67d",
+      "action": "CONTRACT_ACTIVE",
+      "details": "Escrow activated with total pot KES 2000",
+      "timestamp": "2026-05-26T09:56:31.366Z"
+    },
+    {
+      "id": "log_f4u8kw8g0i",
+      "contractId": "c_flc5t67d",
+      "userId": "u_gqonwdfj",
+      "action": "STAKE_LOCKED",
+      "details": "Staked KES 1000 locked by User_6310",
+      "timestamp": "2026-05-26T09:56:31.365Z"
+    },
+    {
+      "id": "log_p4figswtro",
+      "userId": "u_gqonwdfj",
+      "action": "MPESA_STK_PUSH_SUCCESS",
+      "details": "M-Pesa STK Push succeeded. Credited wallet KES 1000. M-Pesa Ref: MPESA_2N9G9Z",
+      "timestamp": "2026-05-26T09:56:31.361Z"
+    },
+    {
+      "id": "log_fc0m7icyqj",
+      "contractId": "c_flc5t67d",
+      "userId": "u_gqonwdfj",
+      "action": "MPESA_STK_PUSH_INITIATED",
+      "details": "STK Push of KES 1000 initiated for phone 254706266310. Checkout ID: ws_CO_1779789387844_DFB3",
+      "timestamp": "2026-05-26T09:56:27.846Z"
+    },
+    {
+      "id": "log_o3wsaazyg2",
+      "contractId": "c_flc5t67d",
+      "userId": "u1",
+      "action": "STAKE_LOCKED",
+      "details": "Staked KES 1000 locked by MwangiEscrow",
+      "timestamp": "2026-05-26T09:56:12.458Z"
+    },
+    {
+      "id": "log_sua6kbt4nt",
+      "userId": "u1",
+      "action": "MPESA_STK_PUSH_SUCCESS",
+      "details": "M-Pesa STK Push succeeded. Credited wallet KES 1000. M-Pesa Ref: MPESA_430P4R",
+      "timestamp": "2026-05-26T09:56:12.454Z"
+    },
+    {
+      "id": "log_0bgaaob2p7",
+      "contractId": "c_flc5t67d",
+      "userId": "u1",
+      "action": "MPESA_STK_PUSH_INITIATED",
+      "details": "STK Push of KES 1000 initiated for phone 254712345678. Checkout ID: ws_CO_1779789368940_EXUC",
+      "timestamp": "2026-05-26T09:56:08.940Z"
+    },
+    {
+      "id": "log_mr6lw5q8xk",
+      "contractId": "c_flc5t67d",
+      "userId": "u_gqonwdfj",
+      "action": "CONTRACT_CREATED",
+      "details": "Contract created by creator u_gqonwdfj. Stake KES 1000. Status: AWAITING_FUNDING",
+      "timestamp": "2026-05-26T09:55:36.791Z"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "n_0walgrh5lz",
+      "userId": "u_gqonwdfj",
+      "title": "Contract in Dispute ⚖️",
+      "message": "MwangiEscrow rejected your win claim on \"Ruto wins\" and opened a dispute. Reason: \"he hasnt won, election date hasnt passed...\". Admin review triggered.",
+      "contractId": "c_flc5t67d",
+      "type": "DISPUTE_OPENED",
+      "read": false,
+      "createdAt": "2026-05-26T09:58:03.050Z"
+    },
+    {
+      "id": "n_en96m9luco",
+      "userId": "u1",
+      "title": "Win Claimed - Action Required ⚠️",
+      "message": "User_6310 has claimed a win on contract \"Ruto wins\". Do you approve the settlement?",
+      "contractId": "c_flc5t67d",
+      "type": "CLAIM_MADE",
+      "read": false,
+      "createdAt": "2026-05-26T09:56:44.889Z"
+    },
+    {
+      "id": "n_8q6xeus6lv",
+      "userId": "u1",
+      "title": "Escrow Vault Active! 🔒",
+      "message": "Both parties have funded \"Ruto wins\". KES 2000 is now secured in Wekelea escrow. Settle arguments instantly!",
+      "contractId": "c_flc5t67d",
+      "type": "CONTRACT_ACTIVE",
+      "read": false,
+      "createdAt": "2026-05-26T09:56:31.365Z"
+    },
+    {
+      "id": "n_x58yws7cgv",
+      "userId": "u_gqonwdfj",
+      "title": "Escrow Vault Active! 🔒",
+      "message": "Both parties have funded \"Ruto wins\". KES 2000 is now secured in Wekelea escrow. Settle arguments instantly!",
+      "contractId": "c_flc5t67d",
+      "type": "CONTRACT_ACTIVE",
+      "read": false,
+      "createdAt": "2026-05-26T09:56:31.365Z"
+    },
+    {
+      "id": "n1",
+      "userId": "u2",
+      "title": "Challenge Accepted & Active! 🚀",
+      "message": "MwangiEscrow accepted and funded the \"Arsenal beats Manchester United\" challenge. Total pot of KES 2,000 is now locked in escrow.",
+      "contractId": "c1",
+      "type": "CONTRACT_ACTIVE",
+      "read": false,
+      "createdAt": "2026-05-25T10:15:00Z"
+    },
+    {
+      "id": "n2",
+      "userId": "u1",
+      "title": "New Challenge Received! 🤝",
+      "message": "Kip_Runner has challenged you: \"Bitcoin exceeds $72,000 on June 1\". Stake: KES 2,500.",
+      "contractId": "c2",
+      "type": "CONTRACT_INVITE",
+      "read": false,
+      "createdAt": "2026-05-26T08:00:00Z"
+    },
+    {
+      "id": "n3",
+      "userId": "u4",
+      "title": "Win Claimed by Counterparty ⚠️",
+      "message": "Achieng_Dev claimed a win on \"Codename X stream run\". Review terms and approve settlement.",
+      "contractId": "c4",
+      "type": "CLAIM_MADE",
+      "read": false,
+      "createdAt": "2026-05-26T05:30:00Z"
+    },
+    {
+      "id": "n4",
+      "userId": "u3",
+      "title": "Contract in Dispute ⚖️",
+      "message": "Kip_Runner has disputed your claim on \"Codename X stream run\". Admin arbitration has been triggered.",
+      "contractId": "c4",
+      "type": "DISPUTE_OPENED",
+      "read": false,
+      "createdAt": "2026-05-26T06:00:00Z"
+    }
+  ],
+  "disputes": [
+    {
+      "id": "d1",
+      "contractId": "c4",
+      "openedById": "u4",
+      "reason": "The overlay timer stopped for 5 minutes during a loading screen crash. Real play time was 2 hours and 3 minutes.",
+      "evidenceLink": "https://twitch.tv/clip/mock-achieng-speedrun-timer-issue",
+      "status": "OPEN",
+      "createdAt": "2026-05-26T06:00:00Z"
+    },
+    {
+      "id": "d_u440lmg7ux",
+      "contractId": "c_flc5t67d",
+      "openedById": "u1",
+      "reason": "he hasnt won, election date hasnt passed",
+      "status": "OPEN",
+      "createdAt": "2026-05-26T09:58:03.050Z"
+    }
+  ],
+  "transactions": [
+    {
+      "id": "tx_0s7r681hle",
+      "userId": "u_gqonwdfj",
+      "amount": 1000,
+      "type": "LOCK",
+      "status": "SUCCESS",
+      "reference": "LOCK_flc5t67d_u_gqonwdfj",
+      "description": "Escrow stake locked for \"Ruto wins\"",
+      "createdAt": "2026-05-26T09:56:31.365Z"
+    },
+    {
+      "id": "tx_h1rrwz4q08",
+      "userId": "u_gqonwdfj",
+      "amount": 1000,
+      "type": "DEPOSIT",
+      "status": "SUCCESS",
+      "reference": "MPESA_2N9G9Z",
+      "description": "Deposited KES 1000 via M-Pesa (Ref: MPESA_2N9G9Z)",
+      "createdAt": "2026-05-26T09:56:27.844Z"
+    },
+    {
+      "id": "tx_a7sdbpxxft",
+      "userId": "u1",
+      "amount": 1000,
+      "type": "LOCK",
+      "status": "SUCCESS",
+      "reference": "LOCK_flc5t67d_u1",
+      "description": "Escrow stake locked for \"Ruto wins\"",
+      "createdAt": "2026-05-26T09:56:12.458Z"
+    },
+    {
+      "id": "tx_369w5wpthd",
+      "userId": "u1",
+      "amount": 1000,
+      "type": "DEPOSIT",
+      "status": "SUCCESS",
+      "reference": "MPESA_430P4R",
+      "description": "Deposited KES 1000 via M-Pesa (Ref: MPESA_430P4R)",
+      "createdAt": "2026-05-26T09:56:08.940Z"
+    },
+    {
+      "id": "t1",
+      "userId": "u1",
+      "amount": 1000,
+      "type": "LOCK",
+      "status": "SUCCESS",
+      "reference": "MPESA-TX-10932",
+      "description": "Stake lock for \"Arsenal beats Manchester United\"",
+      "createdAt": "2026-05-25T10:10:00Z"
+    },
+    {
+      "id": "t2",
+      "userId": "u2",
+      "amount": 1000,
+      "type": "LOCK",
+      "status": "SUCCESS",
+      "reference": "MPESA-TX-10984",
+      "description": "Stake lock for \"Arsenal beats Manchester United\"",
+      "createdAt": "2026-05-25T10:15:00Z"
+    },
+    {
+      "id": "t3",
+      "userId": "u4",
+      "amount": 2500,
+      "type": "LOCK",
+      "status": "SUCCESS",
+      "reference": "MPESA-TX-20831",
+      "description": "Stake lock for \"Bitcoin exceeds $72,000 on June 1\"",
+      "createdAt": "2026-05-26T08:05:00Z"
+    }
+  ]
+}

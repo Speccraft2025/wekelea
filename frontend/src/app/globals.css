@@ -1,0 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-outfit: 'Outfit', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+  
+  --background: 13 13 15; /* #0d0d0f */
+  --foreground: 255 255 255;
+  
+  --primary: 236 117 5;    /* #EC7505 - Brand Orange */
+  --primary-glow: rgba(236, 117, 5, 0.15);
+  
+  --accent: 232 144 5;    /* #E89005 - Brand Golden Yellow */
+  --accent-glow: rgba(232, 144, 5, 0.15);
+  
+  --card-bg: 20 20 23;     /* #141417 */
+  --border-color: 255 255 255 / 0.08;
+  
+  --danger: 231 14 2;      /* #E70E02 - Brand Red */
+  --success: 34 197 94;    /* Green */
+}
+
+body {
+  color: rgb(var(--foreground));
+  background: radial-gradient(circle at 50% 0%, rgb(45 22 10) 0%, rgb(var(--background)) 75%);
+  font-family: var(--font-inter);
+  min-height: 100vh;
+  overflow-x: hidden;
+  letter-spacing: -0.01em;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-outfit);
+}
+
+/* Glassmorphism Utilities */
+.glass {
+  background: rgba(20, 20, 23, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-premium {
+  background: linear-gradient(135deg, rgba(20, 20, 23, 0.7) 0%, rgba(10, 10, 12, 0.8) 100%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(232, 144, 5, 0.15);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+.glass-interactive {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-interactive:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(236, 117, 5, 0.25);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px -10px rgba(236, 117, 5, 0.15);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(var(--background), 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--primary), 0.3);
+}
+
+/* Pulsing Vault Glow */
+@keyframes vault-pulse {
+  0%, 100% {
+    box-shadow: 0 0 15px 2px rgba(var(--primary), 0.2);
+    border-color: rgba(var(--primary), 0.4);
+  }
+  50% {
+    box-shadow: 0 0 30px 8px rgba(var(--primary), 0.4);
+    border-color: rgba(var(--primary), 0.8);
+  }
+}
+
+.vault-glow {
+  animation: vault-pulse 3s infinite ease-in-out;
+}
+
+/* Custom Checkbox */
+.custom-checkbox {
+  appearance: none;
+  background-color: transparent;
+  margin: 0;
+  font: inherit;
+  color: rgb(var(--primary));
+  width: 1.25em;
+  height: 1.25em;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  transform: translateY(-0.075em);
+  display: grid;
+  place-content: center;
+  transition: all 0.2s ease-in-out;
+  cursor: pointer;
+}
+
+.custom-checkbox::before {
+  content: "";
+  width: 0.65em;
+  height: 0.65em;
+  transform: scale(0);
+  transition: 120ms transform ease-in-out;
+  box-shadow: inset 1em 1em rgb(var(--primary));
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.custom-checkbox:checked {
+  border-color: rgb(var(--primary));
+  background: rgba(var(--primary), 0.05);
+}
+
+.custom-checkbox:checked::before {
+  transform: scale(1);
+}
+
+.custom-checkbox:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--primary), 0.3);
+}
+
+/* Input Fields Style */
+.input-field {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: white;
+  padding: 12px 16px;
+  font-family: var(--font-inter);
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: rgb(var(--primary));
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(var(--primary), 0.1);
+}
+
+/* Kenyan Flag Colors Accent Line */
+.kenya-accent {
+  background: linear-gradient(to right, #000000 24%, #BB0000 24%, #BB0000 26%, #000000 26%, #000000 49%, #BB0000 49%, #BB0000 51%, #006600 51%, #006600 74%, #BB0000 74%, #BB0000 76%, #006600 76%);
+  height: 4px;
+}

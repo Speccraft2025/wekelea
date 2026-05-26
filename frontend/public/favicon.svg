@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <linearGradient id="wekeleaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E70E02" />
+      <stop offset="25%" stop-color="#F42B03" />
+      <stop offset="50%" stop-color="#D84A05" />
+      <stop offset="75%" stop-color="#EC7505" />
+      <stop offset="100%" stop-color="#E89005" />
+    </linearGradient>
+  </defs>
+  <!-- Handshake V Shape -->
+  <g fill="url(#wekeleaGrad)">
+    <!-- Left Arm -->
+    <polygon points="120,160 180,140 250,240 225,275 150,250" />
+    <!-- Right Arm -->
+    <polygon points="392,160 332,140 262,240 287,275 362,250" />
+    <!-- Thumb Clasp -->
+    <polygon points="225,220 255,200 275,220 245,245" />
+    <!-- Fingers -->
+    <path d="M230,255 L280,295 M239.6,271 L289.6,311 M249.2,287 L299.2,327 M258.8,303 L308.8,343" stroke="url(#wekeleaGrad)" stroke-width="16" stroke-linecap="round" />
+  </g>
+</svg>
