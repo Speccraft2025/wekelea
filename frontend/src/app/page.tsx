@@ -1,4 +1,3 @@
-'use html';
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -29,15 +28,14 @@ import {
   Scale,
   Trash2
 } from 'lucide-react';
-import { WekeleaAPI, User, Contract, Dispute, Transaction, Notification, EventCategory, PrivacySetting } from '../services/api';
-import { io, Socket } from 'socket.io-client';
+import { WekeleaAPI, User, Contract, Dispute, Transaction, Notification, AgreementCategory, PrivacySetting } from '../services/api';
+import { supabaseBrowser } from '../lib/supabaseBrowser';
 import dynamic from 'next/dynamic';
+import { QRCodeSVG } from 'qrcode.react';
 
 const ThreeDSplashScreen = dynamic(() => import('../components/ThreeDSplashScreen'), {
   ssr: false
 });
-
-const BACKEND_WS = 'http://localhost:5001';
 
 export default function WekeleaApp() {
   // --- STATE ---
@@ -48,7 +46,10 @@ export default function WekeleaApp() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
-  
+  // Admin: lookup maps so dispute resolution targets the real contract parties
+  const [usersById, setUsersById] = useState<Record<string, User>>({});
+  const [contractsByDispute, setContractsByDispute] = useState<Record<string, Contract>>({});
+
   // Active UI views
   const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'create-contract' | 'wallet' | 'admin' | 'dispute-details'>('landing');
   const [activeTab, setActiveTab] = useState<'active' | 'pending' | 'completed'>('active');
@@ -66,16 +67,20 @@ export default function WekeleaApp() {
   const [disputeReason, setDisputeReason] = useState('');
   const [adminResolutionNotes, setAdminResolutionNotes] = useState('');
   const [copiedLink, setCopiedLink] = useState(false);
+  // Legal policy modal (Terms / Privacy / Responsible Use)
+  const [legalModal, setLegalModal] = useState<null | 'terms' | 'privacy' | 'responsible'>(null);
+  // Deep-link: contractId from ?contractId= that we want to open once the user is authenticated
+  const [pendingContractId, setPendingContractId] = useState<string | null>(null);
 
   // New Contract creation fields
   const [newTitle, setNewTitle] = useState('');
-  const [newCategory, setNewCategory] = useState<EventCategory>('Sports');
+  const [newCategory, setNewCategory] = useState<AgreementCategory>('Creative Work');
   const [newTerms, setNewTerms] = useState('');
   const [newTermsList, setNewTermsList] = useState<string[]>(['']);
-  const [newStake, setNewStake] = useState('1000');
+  const [newEscrow, setNewEscrow] = useState('1000');
   const [newEventDate, setNewEventDate] = useState('');
   const [newTrustedSource, setNewTrustedSource] = useState('');
-  const [newTrashTalk, setNewTrashTalk] = useState('');
+  const [newNote, setNewNote] = useState('');
   const [newPrivacy, setNewPrivacy] = useState<PrivacySetting>('Private');
   const [newCounterparty, setNewCounterparty] = useState('');
   const [claimChecklist, setClaimChecklist] = useState<Record<number, boolean>>({});
@@ -88,8 +93,6 @@ export default function WekeleaApp() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [mpesaError, setMpesaError] = useState<string | null>(null);
 
-  // Socket
-  const socketRef = useRef<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
   // Demo Assist states
@@ -98,6 +101,13 @@ export default function WekeleaApp() {
 
   // --- COMPONENT MOUNT & DATA INITIALIZATION ---
   useEffect(() => {
+    // Capture a shared contract deep-link (?contractId=...) before anything else
+    const params = new URLSearchParams(window.location.search);
+    const linkedContractId = params.get('contractId');
+    if (linkedContractId) {
+      setPendingContractId(linkedContractId);
+    }
+
     // Attempt auto-login with first user for demo ease
     const savedUser = localStorage.getItem('wekelea_user');
     if (savedUser) {
@@ -109,8 +119,34 @@ export default function WekeleaApp() {
         // Clear corrupt storage
         localStorage.removeItem('wekelea_user');
       }
+    } else if (linkedContractId) {
+      // Not logged in but arriving via an invite link — prompt sign-in
+      setShowLoginModal(true);
     }
   }, []);
+
+  // Resolve a pending deep-linked contract once the user is authenticated
+  useEffect(() => {
+    if (!currentUser || !pendingContractId) return;
+    let cancelled = false;
+    WekeleaAPI.getContract(pendingContractId)
+      .then((contract) => {
+        if (cancelled) return;
+        setCurrentView('dashboard');
+        setSelectedContract(contract);
+      })
+      .catch((err) => console.error('Deep-link contract not found:', err))
+      .finally(() => {
+        if (!cancelled) {
+          setPendingContractId(null);
+          // Strip the query param so a refresh doesn't reopen it
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [currentUser, pendingContractId]);
 
   // Reset checklists when active contract changes
   useEffect(() => {
@@ -150,6 +186,22 @@ export default function WekeleaApp() {
         if (currentUser.id === 'admin') {
           const allDisputes = await WekeleaAPI.getDisputes();
           setDisputes(allDisputes);
+
+          // Build a user lookup so we can label + target the real contract parties
+          const allUsers = await WekeleaAPI.getUsers();
+          setUsersById(Object.fromEntries(allUsers.map((u) => [u.id, u])));
+
+          // Fetch the contract behind each dispute (admin doesn't own them)
+          const disputeContracts = await Promise.all(
+            allDisputes.map((d) =>
+              WekeleaAPI.getContract(d.contractId)
+                .then((c) => [d.id, c] as const)
+                .catch(() => null)
+            )
+          );
+          setContractsByDispute(
+            Object.fromEntries(disputeContracts.filter((e): e is readonly [string, Contract] => e !== null))
+          );
         }
       } catch (err) {
         console.error('API Error: Data fetching failed, using fallback mock states', err);
@@ -162,82 +214,61 @@ export default function WekeleaApp() {
     return () => clearInterval(interval);
   }, [currentUser, selectedContract?.id]);
 
-  // Configure WebSockets for instant state push
+  // Live updates via Supabase Realtime. If Supabase isn't configured in the
+  // browser, this is a no-op and the 4s polling effect above keeps things fresh.
   useEffect(() => {
     if (!currentUser) return;
+    const supabase = supabaseBrowser();
+    if (!supabase) return;
 
-    // Connect to Backend Socket Server
-    const socket = io(BACKEND_WS);
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      setIsConnected(true);
-      console.log('🔌 Connected to Wekelea real-time engine');
-      
-      // Register this socket to receive notification push alerts
-      socket.emit('join_user_notifications', currentUser.id);
-      
-      if (currentUser.id === 'admin') {
-        socket.emit('join_admin');
+    const refresh = async () => {
+      try {
+        const [freshContracts, freshNotes] = await Promise.all([
+          WekeleaAPI.getContracts(currentUser.id),
+          WekeleaAPI.getNotifications(currentUser.id),
+        ]);
+        setContracts(freshContracts);
+        setNotifications(freshNotes);
+        // Keep an open agreement detail in sync from the fresh list
+        setSelectedContract(prev => (prev ? freshContracts.find(c => c.id === prev.id) ?? prev : prev));
+        if (currentUser.id === 'admin') {
+          setDisputes(await WekeleaAPI.getDisputes());
+        }
+      } catch (e) {
+        console.error('Realtime refresh failed', e);
       }
-    });
+    };
 
-    socket.on('disconnect', () => {
-      setIsConnected(false);
-    });
-
-    // Listen for real-time notifications
-    socket.on('notification_received', async (data: { title: string; contractId?: string }) => {
-      // Display quick interactive alert banner
-      setNotificationBanner({
-        title: data.title,
-        message: 'Click to open details and sync live status.'
-      });
-      setTimeout(() => setNotificationBanner(null), 5000);
-
-      // Re-fetch notifications
-      const freshNotes = await WekeleaAPI.getNotifications(currentUser.id);
-      setNotifications(freshNotes);
-      
-      // Re-fetch contracts
-      const freshContracts = await WekeleaAPI.getContracts(currentUser.id);
-      setContracts(freshContracts);
-    });
-
-    // Listen for balance updates
-    socket.on('balance_updated', (data: { balance: number }) => {
-      setCurrentUser(prev => prev ? { ...prev, walletBalance: data.balance } : null);
-    });
-
-    // Listen for general resets
-    socket.on('system_reset', () => {
-      window.location.reload();
-    });
+    const channel = supabase
+      .channel('wekelea-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contracts' }, refresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'disputes' }, refresh)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUser.id}` },
+        (payload: { new?: { title?: string } }) => {
+          setNotificationBanner({
+            title: payload.new?.title || 'New update',
+            message: 'Click to open details and sync live status.',
+          });
+          setTimeout(() => setNotificationBanner(null), 5000);
+          refresh();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'users', filter: `id=eq.${currentUser.id}` },
+        (payload: { new?: { wallet_balance?: number | string } }) => {
+          const bal = payload.new?.wallet_balance;
+          if (bal !== undefined) setCurrentUser(prev => (prev ? { ...prev, walletBalance: Number(bal) } : prev));
+        }
+      )
+      .subscribe((status: string) => setIsConnected(status === 'SUBSCRIBED'));
 
     return () => {
-      socket.disconnect();
+      supabase.removeChannel(channel);
     };
   }, [currentUser?.id]);
-
-  // Join selected contract room on socket to listen for live status updates
-  useEffect(() => {
-    if (!socketRef.current || !selectedContract) return;
-
-    const socket = socketRef.current;
-    socket.emit('join_contract', selectedContract.id);
-
-    socket.on('contract_updated', (updated: Contract) => {
-      console.log('📄 Live Update: Contract state synchronized', updated);
-      setSelectedContract(updated);
-      
-      // Also update in contracts list
-      setContracts(prev => prev.map(c => c.id === updated.id ? updated : c));
-    });
-
-    return () => {
-      socket.off('contract_updated');
-    };
-  }, [selectedContract?.id]);
 
   // --- HANDLERS ---
   
@@ -318,10 +349,10 @@ export default function WekeleaApp() {
         category: newCategory,
         terms: activeTerms.join('; '),
         termsList: activeTerms,
-        stakeAmount: Number(newStake),
+        escrowAmount: Number(newEscrow),
         eventDate: newEventDate ? new Date(newEventDate).toISOString() : new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
         trustedSource: newTrustedSource,
-        trashTalk: newTrashTalk,
+        note: newNote,
         privacy: newPrivacy,
         creatorId: currentUser.id,
         counterpartyUsername: newCounterparty
@@ -331,17 +362,17 @@ export default function WekeleaApp() {
       setNewTitle('');
       setNewTerms('');
       setNewTermsList(['']);
-      setNewStake('1000');
+      setNewEscrow('1000');
       setNewEventDate('');
       setNewTrustedSource('');
-      setNewTrashTalk('');
+      setNewNote('');
       setNewCounterparty('');
 
       setSelectedContract(contract);
       setCurrentView('dashboard');
       setShowShareModal(true);
     } catch (err: any) {
-      alert(err.message || 'Failed to create contract');
+      alert(err.message || 'Failed to create agreement');
     }
   };
 
@@ -351,7 +382,7 @@ export default function WekeleaApp() {
       const updated = await WekeleaAPI.acceptContract(contractId, currentUser.id);
       setSelectedContract(updated);
     } catch (e: any) {
-      alert(e.message || 'Error accepting contract');
+      alert(e.message || 'Error accepting agreement');
     }
   };
 
@@ -360,7 +391,7 @@ export default function WekeleaApp() {
     if (!currentUser) return;
     
     setMpesaPhone(currentUser.phone);
-    setMpesaAmount(contract.stakeAmount);
+    setMpesaAmount(contract.escrowAmount);
     setShowMpesaPrompt(true);
   };
 
@@ -387,7 +418,7 @@ export default function WekeleaApp() {
           // 2. Trigger simulated callback response (success)
           await WekeleaAPI.triggerCallback(res.CheckoutRequestID, true);
           
-          // 3. Immediately trigger lock stake on the contract
+          // 3. Immediately fund the escrow on the agreement
           const updated = await WekeleaAPI.fundContract(selectedContract.id, currentUser.id);
           setSelectedContract(updated);
 
@@ -411,10 +442,10 @@ export default function WekeleaApp() {
     }
   };
 
-  const handleClaimWin = async (contractId: string) => {
+  const handleRequestRelease = async (contractId: string) => {
     if (!currentUser) return;
     try {
-      const updated = await WekeleaAPI.claimWin(contractId, currentUser.id);
+      const updated = await WekeleaAPI.requestRelease(contractId, currentUser.id);
       setSelectedContract(updated);
     } catch (e: any) {
       alert(e.message);
@@ -423,9 +454,9 @@ export default function WekeleaApp() {
 
   const handleApproveSettle = async (contractId: string) => {
     if (!currentUser) return;
-    if (!confirm('Are you sure you want to approve settlement? This will immediately release KES ' + selectedContract?.totalPot + ' (minus 5% fee) to the winner wallet.')) return;
+    if (!confirm('Approve release of the escrow? This will immediately release KES ' + selectedContract?.totalEscrow + ' (minus the 5% service fee) to the receiving party.')) return;
     try {
-      const updated = await WekeleaAPI.approveSettlement(contractId, currentUser.id);
+      const updated = await WekeleaAPI.approveRelease(contractId, currentUser.id);
       setSelectedContract(updated);
       
       const freshUser = await WekeleaAPI.getUser(currentUser.id);
@@ -441,7 +472,7 @@ export default function WekeleaApp() {
     if (!currentUser || !selectedContract || !disputeReason) return;
 
     try {
-      const updated = await WekeleaAPI.disputeClaim(selectedContract.id, currentUser.id, disputeReason);
+      const updated = await WekeleaAPI.disputeRelease(selectedContract.id, currentUser.id, disputeReason);
       setSelectedContract(updated);
       setShowDisputeModal(false);
       setDisputeReason('');
@@ -471,15 +502,15 @@ export default function WekeleaApp() {
     }
   };
 
-  const handleAdminResolve = async (disputeId: string, winnerId: string) => {
+  const handleAdminResolve = async (disputeId: string, recipientId: string) => {
     if (!currentUser || currentUser.id !== 'admin' || !adminResolutionNotes) {
       alert('Resolution notes are required');
       return;
     }
 
     try {
-      await WekeleaAPI.adminResolveDispute(disputeId, winnerId, adminResolutionNotes);
-      alert('Dispute successfully arbitrated. Funds distributed to winner.');
+      await WekeleaAPI.adminResolveDispute(disputeId, recipientId, adminResolutionNotes);
+      alert('Dispute resolved. Escrow released to the receiving party.');
       setAdminResolutionNotes('');
       
       // Update local disputes
@@ -503,7 +534,7 @@ export default function WekeleaApp() {
 
     try {
       await WekeleaAPI.adminRefundDispute(disputeId, adminResolutionNotes);
-      alert('Stakes refunded fully to both users. Dispute closed.');
+      alert('Escrow refunded fully to both parties. Dispute closed.');
       setAdminResolutionNotes('');
       
       // Update local disputes
@@ -554,13 +585,33 @@ export default function WekeleaApp() {
     }
   };
 
-  const getCategoryIcon = (category: EventCategory) => {
+  // Friendly, agreement-oriented labels for the internal state tokens.
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'DRAFT': return 'Draft';
+      case 'AWAITING_ACCEPTANCE': return 'Awaiting Acceptance';
+      case 'AWAITING_FUNDING': return 'Awaiting Escrow Funding';
+      case 'ACTIVE': return 'Active';
+      case 'CLAIMED': return 'Release Requested';
+      case 'SETTLED': return 'Completed';
+      case 'DISPUTED': return 'In Dispute';
+      case 'REFUNDED': return 'Refunded';
+      default: return status;
+    }
+  };
+
+  const getCategoryIcon = (category: AgreementCategory) => {
     switch (category) {
-      case 'Sports': return '🏆';
-      case 'Gaming': return '🎮';
-      case 'Crypto': return '🪙';
-      case 'Entertainment': return '🎬';
-      case 'Politics': return '⚖️';
+      case 'Creative Work': return '🎨';
+      case 'Freelance': return '💼';
+      case 'Personal Goal': return '🎯';
+      case 'Fitness': return '💪';
+      case 'Business': return '🏢';
+      case 'Lending': return '🤲';
+      case 'Marketplace': return '🛒';
+      case 'Deliveries': return '📦';
+      case 'Coaching': return '🧭';
+      case 'Community': return '🌍';
       default: return '🤝';
     }
   };
@@ -643,11 +694,11 @@ export default function WekeleaApp() {
             </div>
             <div className="kenya-accent w-32 rounded" />
             <h1 className="text-4xl font-extrabold tracking-tight pt-2 leading-none">
-              Put your money where <br />
-              <span className="text-[#EC7505] bg-clip-text">your mouth is.</span>
+              Make every agreement <br />
+              <span className="text-[#EC7505] bg-clip-text">enforceable.</span>
             </h1>
             <p className="text-gray-400 text-sm max-w-sm">
-              Settle social arguments instantly. Create custom conditional contracts, lock stakes in escrow using M-Pesa, and verify mutual settlement. Fast, peer-to-peer, and secure.
+              Wekelea securely holds funds in escrow and releases them only when the agreed conditions are met — for freelance work, personal goals, business deals and more. Fast, peer-to-peer, and secure.
             </p>
           </div>
 
@@ -665,7 +716,7 @@ export default function WekeleaApp() {
               className="w-full bg-[#EC7505] hover:bg-[#D84A05] text-black font-extrabold py-4 px-6 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2 text-lg active:scale-95"
             >
               <ShieldCheck size={22} />
-              <span>Launch App & Challenge</span>
+              <span>Launch App & Create Agreement</span>
             </button>
 
             <button 
@@ -685,7 +736,7 @@ export default function WekeleaApp() {
             <div className="glass p-4 rounded-2xl flex flex-col space-y-2 border-white/5">
               <span className="text-2xl">🤝</span>
               <h3 className="font-bold text-sm">P2P Escrow</h3>
-              <p className="text-[11px] text-gray-400 leading-tight">Consenting agreements. Funds remain fully secured inside independent vault ledger.</p>
+              <p className="text-[11px] text-gray-400 leading-tight">Mutual agreements. Funds stay fully secured inside an independent escrow ledger.</p>
             </div>
             <div className="glass p-4 rounded-2xl flex flex-col space-y-2 border-white/5">
               <span className="text-2xl">🟢</span>
@@ -695,51 +746,82 @@ export default function WekeleaApp() {
             <div className="glass p-4 rounded-2xl flex flex-col space-y-2 border-white/5">
               <span className="text-2xl">🔬</span>
               <h3 className="font-bold text-sm">100% Verifiable</h3>
-              <p className="text-[11px] text-gray-400 leading-tight">Only objective events allowed. Clear parameters ensure honest, unambiguous settlement.</p>
+              <p className="text-[11px] text-gray-400 leading-tight">Only objective, verifiable conditions. Clear criteria ensure fair, unambiguous release.</p>
             </div>
             <div className="glass p-4 rounded-2xl flex flex-col space-y-2 border-white/5">
               <span className="text-2xl">⚖️</span>
               <h3 className="font-bold text-sm">Dispute Safe</h3>
-              <p className="text-[11px] text-gray-400 leading-tight">Modular arbiter rules. Freezes stakes and relies on trust logs and evidence boards.</p>
+              <p className="text-[11px] text-gray-400 leading-tight">Neutral arbitration. Escrow freezes and relies on trust logs and evidence if parties disagree.</p>
             </div>
           </div>
 
-          {/* Brand Assets Reference & Info Box */}
+          {/* Live Public Agreements Feed */}
           <div className="glass p-5 rounded-3xl border-white/5 space-y-3">
-            <h3 className="font-extrabold text-white text-sm flex items-center space-x-1.5">
-              <span>🎨</span>
-              <span>Wekelea Custom Branding Setup</span>
-            </h3>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              Your custom branding is fully integrated! We mapped your uploaded logo assets inside the project directories for instant application-wide updates.
-            </p>
-            <div className="bg-black/20 rounded-xl p-3 text-[10px] font-mono space-y-1.5 border border-white/5">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">Branding Folder:</span>
-                <span className="text-[#EC7505]">/frontend/public/assets</span>
-              </div>
-              <div className="flex justify-between items-center border-t border-white/5 pt-1.5">
-                <span className="text-gray-400">Active Logo file:</span>
-                <span className="text-emerald-400">logo.png (104 KB)</span>
-              </div>
-              <div className="flex justify-between items-center border-t border-white/5 pt-1.5">
-                <span className="text-gray-400">Active Icon file:</span>
-                <span className="text-emerald-400">favicon.ico (4 KB)</span>
-              </div>
+            <div className="flex items-center justify-between">
+              <h3 className="font-extrabold text-white text-sm flex items-center space-x-1.5">
+                <Globe size={16} className="text-[#EC7505]" />
+                <span>Live Open Agreements</span>
+              </h3>
+              <span className="flex items-center space-x-1 text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                <span>Live</span>
+              </span>
             </div>
-            <p className="text-[10px] text-gray-500 leading-snug">
-              To swap logos or icons in the future, simply drop your new images directly into the <code className="text-white">public/assets</code> folder, overwriting the filenames above.
+            <p className="text-[11px] text-gray-500 leading-snug">
+              Open agreements awaiting another party. Sign in to accept one and fund the escrow.
             </p>
+
+            {(() => {
+              const openAgreements = contracts
+                .filter((c) => c.privacy === 'Public' && ['DRAFT', 'AWAITING_ACCEPTANCE', 'AWAITING_FUNDING'].includes(c.status))
+                .slice(0, 5);
+
+              if (openAgreements.length === 0) {
+                return (
+                  <div className="bg-black/20 rounded-xl p-6 text-center border border-white/5">
+                    <span className="text-2xl block mb-1">🕊️</span>
+                    <p className="text-[11px] text-gray-500">No open public agreements right now. Be the first — launch the app and create one.</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-2">
+                  {openAgreements.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => {
+                        setPendingContractId(c.id);
+                        setShowLoginModal(true);
+                      }}
+                      className="w-full bg-black/20 hover:bg-white/5 rounded-xl p-3 border border-white/5 flex items-center justify-between text-left transition active:scale-[0.99]"
+                    >
+                      <div className="flex items-center space-x-2.5 min-w-0">
+                        <span className="text-lg flex-shrink-0">{getCategoryIcon(c.category)}</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-white truncate">{c.title}</p>
+                          <p className="text-[10px] text-gray-500">{c.category} · escrow KES {c.escrowAmount.toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end flex-shrink-0 pl-2">
+                        <span className="text-[11px] font-black text-[#EC7505]">KES {c.totalEscrow.toLocaleString()}</span>
+                        <span className="text-[9px] text-gray-500 uppercase">in escrow</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Legal / Policy Section */}
           <div id="how-it-works-section" className="glass p-5 rounded-2xl border-white/5 space-y-4 mt-8">
             <h3 className="font-extrabold text-white text-lg flex items-center space-x-1.5">
               <span>⚖️</span>
-              <span>Wekelea Responsible Use & Trust Rules</span>
+              <span>Wekelea Trust & Escrow Rules</span>
             </h3>
             <p className="text-xs text-gray-400 leading-relaxed">
-              Wekelea is built entirely as a <strong>peer-to-peer escrow service</strong>. We provide secure vaults for two consenting users to hold custom challenge stakes. The platform itself generates no odds, acts as no bookmaker, provides no automated scraping feeds, and enforces that agreements must be based only on objectively verifiable events.
+              Wekelea is a <strong>peer-to-peer escrow platform for agreements</strong>. We securely hold funds for two consenting parties and release them only when agreed conditions are verified. The platform generates no odds, takes no position, and enforces that agreements reference only objective, verifiable conditions.
             </p>
             <div className="grid grid-cols-2 gap-3 text-[10px] pt-2">
               <div className="flex items-start space-x-1 text-emerald-400">
@@ -748,19 +830,19 @@ export default function WekeleaApp() {
               </div>
               <div className="flex items-start space-x-1 text-emerald-400">
                 <Check size={12} className="mt-0.5 flex-shrink-0" />
-                <span>Consensual claims & dual settlement approvals</span>
+                <span>Mutual conditions & dual release approvals</span>
               </div>
               <div className="flex items-start space-x-1 text-emerald-400">
                 <Check size={12} className="mt-0.5 flex-shrink-0" />
-                <span>Secure manual dispute evidence boards</span>
+                <span>Secure manual dispute evidence review</span>
               </div>
               <div className="flex items-start space-x-1 text-emerald-400">
                 <Check size={12} className="mt-0.5 flex-shrink-0" />
-                <span>5% platform transaction fee upon payout</span>
+                <span>5% service fee on escrow release</span>
               </div>
             </div>
             <div className="text-[10px] text-gray-400 border-t border-white/5 pt-3">
-              By using our platform, you accept our <span className="text-[#D4AF37] underline cursor-pointer">Terms of Service</span>, <span className="text-[#D4AF37] underline cursor-pointer">Privacy Policy</span>, and strict <span className="text-[#D4AF37] underline cursor-pointer">Responsible Use Policy</span>.
+              By using our platform, you accept our <button onClick={() => setLegalModal('terms')} className="text-[#D4AF37] underline hover:text-[#EC7505] transition">Terms of Service</button>, <button onClick={() => setLegalModal('privacy')} className="text-[#D4AF37] underline hover:text-[#EC7505] transition">Privacy Policy</button>, and strict <button onClick={() => setLegalModal('responsible')} className="text-[#D4AF37] underline hover:text-[#EC7505] transition">Responsible Use Policy</button>.
             </div>
           </div>
 
@@ -838,6 +920,74 @@ export default function WekeleaApp() {
                 {isOtpStep ? 'Confirm Verification' : 'Get Started'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* LEGAL POLICY MODAL (Terms / Privacy / Responsible Use) — top-level so it works pre-login */}
+      {legalModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setLegalModal(null)}>
+          <div className="glass-premium p-6 w-full max-w-md max-h-[80vh] overflow-y-auto rounded-3xl border-white/10 shadow-2xl relative space-y-4" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => setLegalModal(null)} className="absolute top-4 right-4 text-gray-400 hover:text-white">
+              <X size={20} />
+            </button>
+            {(() => {
+              const content = {
+                terms: {
+                  title: 'Terms of Service',
+                  icon: '📜',
+                  body: [
+                    'Wekelea provides a peer-to-peer escrow facility only. We are not a party to, or a guarantor of, any agreement between users.',
+                    'Users must be 18 years or older and legally permitted to enter binding agreements in their jurisdiction.',
+                    'An agreement becomes active only when the participants have accepted the terms and funded the escrow. Funds are held in escrow until the conditions are verified or a dispute is resolved by an arbiter.',
+                    'A 5% service fee is deducted from the escrow on release. No fee is charged on a full dispute refund.',
+                    'Agreements must be based on objective, verifiable conditions. Wekelea reserves the right to freeze or refund agreements that violate these terms.',
+                  ],
+                },
+                privacy: {
+                  title: 'Privacy Policy',
+                  icon: '🔒',
+                  body: [
+                    'We collect only the data required to operate the escrow service: your phone number, username, wallet balance, and agreement history.',
+                    'Your phone number is used for authentication and M-Pesa settlement. It is never sold or shared with third parties for marketing.',
+                    'Agreement details are visible to the parties involved and, for public agreements, to other users browsing the open feed.',
+                    'Transaction and audit logs are retained for dispute resolution and regulatory compliance.',
+                    'You may request export or deletion of your account data at any time by contacting support.',
+                  ],
+                },
+                responsible: {
+                  title: 'Responsible Use Policy',
+                  icon: '⚖️',
+                  body: [
+                    'Wekelea is infrastructure for enforcing agreements between consenting adults — not a gambling product. There are no odds, no house position, and no automated betting.',
+                    'Only commit funds you are prepared to place in escrow. Escrowed funds are locked until conditions are verified and cannot be recalled unilaterally.',
+                    'Agreements must reference clear, objective, verifiable conditions. Ambiguous or unverifiable terms may be refunded by an arbiter.',
+                    'Harassment, coercion, or fraudulent release requests will result in account suspension and loss of standing.',
+                    'Use Wekelea responsibly. If a commitment feels beyond your means, do not fund it. Support resources are available on request.',
+                  ],
+                },
+              }[legalModal];
+              return (
+                <>
+                  <div className="text-center space-y-1 pt-1">
+                    <span className="text-3xl">{content.icon}</span>
+                    <h3 className="text-xl font-black text-white">{content.title}</h3>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">Wekelea Escrow Platform · Nairobi, Kenya</p>
+                  </div>
+                  <div className="space-y-3 text-xs text-gray-300 leading-relaxed">
+                    {content.body.map((para, i) => (
+                      <p key={i} className="flex space-x-2">
+                        <span className="text-[#EC7505] font-bold flex-shrink-0">{i + 1}.</span>
+                        <span>{para}</span>
+                      </p>
+                    ))}
+                  </div>
+                  <button onClick={() => setLegalModal(null)} className="w-full bg-[#EC7505] hover:bg-[#D84A05] text-black font-extrabold py-3 px-4 rounded-xl transition text-xs uppercase tracking-wider active:scale-95">
+                    I Understand
+                  </button>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -948,7 +1098,7 @@ export default function WekeleaApp() {
             <div className="flex-1 flex flex-col space-y-3">
               {notifications.length === 0 ? (
                 <div className="text-center py-12 text-gray-500 text-xs">
-                  No notifications yet. Create a challenge or stakes to see updates.
+                  No notifications yet. Create an agreement to see updates.
                 </div>
               ) : (
                 notifications.map((note) => (
@@ -989,7 +1139,7 @@ export default function WekeleaApp() {
       {currentView === 'dashboard' && currentUser && (
         <div className="flex flex-col space-y-6">
           
-          {/* Quick Create Challenge CTA */}
+          {/* Quick Create Agreement CTA */}
           <div className="flex justify-between items-center pt-2">
             <h2 className="text-lg font-black text-white flex items-center space-x-2">
               <span>💼</span>
@@ -1001,7 +1151,7 @@ export default function WekeleaApp() {
               className="bg-[#EC7505] hover:bg-[#D84A05] text-black font-black text-xs py-2 px-3 rounded-xl flex items-center space-x-1 shadow transition active:scale-95"
             >
               <Plus size={14} />
-              <span>Create Challenge</span>
+              <span>Create Agreement</span>
             </button>
           </div>
 
@@ -1038,7 +1188,7 @@ export default function WekeleaApp() {
                 <p className="text-xs text-gray-400 font-semibold">No agreements found in this section.</p>
                 {activeTab === 'pending' && (
                   <button onClick={() => setCurrentView('create-contract')} className="text-xs text-[#EC7505] underline font-bold">
-                    Create your first challenge now!
+                    Create your first agreement now!
                   </button>
                 )}
               </div>
@@ -1070,15 +1220,15 @@ export default function WekeleaApp() {
                     <p className="text-xs text-gray-400 leading-snug line-clamp-2">{contract.terms}</p>
                   </div>
 
-                  {/* Stake breakdown */}
+                  {/* Escrow breakdown */}
                   <div className="flex justify-between items-center pt-3 border-t border-white/5">
                     <div className="flex items-baseline space-x-1">
-                      <span className="text-[#EC7505] font-black text-base">KES {contract.stakeAmount.toLocaleString()}</span>
+                      <span className="text-[#EC7505] font-black text-base">KES {contract.escrowAmount.toLocaleString()}</span>
                       <span className="text-[9px] text-gray-400 uppercase tracking-wider">each</span>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] text-gray-500 block">Locked Escrow Vault</span>
-                      <span className="font-extrabold text-sm text-white">KES {contract.totalPot.toLocaleString()}</span>
+                      <span className="text-[10px] text-gray-500 block">Total in Escrow</span>
+                      <span className="font-extrabold text-sm text-white">KES {contract.totalEscrow.toLocaleString()}</span>
                     </div>
                   </div>
 
@@ -1111,18 +1261,18 @@ export default function WekeleaApp() {
                 {/* Status Indicator */}
                 <div className="flex flex-col items-center text-center space-y-2 border-b border-white/10 pb-4">
                   <span className={`text-[10px] px-3 py-1 rounded-full border uppercase tracking-wider font-extrabold ${getStatusBadgeClass(selectedContract.status)}`}>
-                    {selectedContract.status} Escrow Vault
+                    {getStatusLabel(selectedContract.status)}
                   </span>
-                  
+
                   {selectedContract.status === 'ACTIVE' && (
                     <div className="flex items-center space-x-1 text-xs text-[#EC7505] font-bold bg-[#EC7505]/10 py-1 px-2.5 rounded-full border border-[#EC7505]/20 animate-pulse">
                       <Lock size={12} />
-                      <span>KES {selectedContract.totalPot.toLocaleString()} LOCKED IN VAULT</span>
+                      <span>KES {selectedContract.totalEscrow.toLocaleString()} HELD IN ESCROW</span>
                     </div>
                   )}
 
                   <h2 className="text-2xl font-black text-white leading-tight pt-1">{selectedContract.title}</h2>
-                  <span className="text-xs text-gray-400">{getCategoryIcon(selectedContract.category)} Category: {selectedContract.category}</span>
+                  <span className="text-xs text-gray-400">{getCategoryIcon(selectedContract.category)} {selectedContract.category}</span>
                 </div>
 
                 {/* Terms Breakdown */}
@@ -1138,19 +1288,19 @@ export default function WekeleaApp() {
                   )}
                 </div>
 
-                {/* Participant Stakes Breakdown */}
+                {/* Participant Escrow Breakdown */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="glass p-3 rounded-xl border-white/5 flex flex-col space-y-1">
-                    <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Creator Stake</span>
-                    <span className="text-xs font-bold text-white">KES {selectedContract.stakeAmount.toLocaleString()}</span>
+                    <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Creator Escrow</span>
+                    <span className="text-xs font-bold text-white">KES {selectedContract.escrowAmount.toLocaleString()}</span>
                     <span className={`text-[10px] font-semibold flex items-center space-x-1 ${selectedContract.creatorStatus === 'FUNDED' ? 'text-emerald-400' : 'text-orange-400'}`}>
                       {selectedContract.creatorStatus === 'FUNDED' ? '✅ Funded' : '⏳ Awaiting Funding'}
                     </span>
                   </div>
 
                   <div className="glass p-3 rounded-xl border-white/5 flex flex-col space-y-1">
-                    <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Opponent Stake</span>
-                    <span className="text-xs font-bold text-white">KES {selectedContract.stakeAmount.toLocaleString()}</span>
+                    <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Other Party Escrow</span>
+                    <span className="text-xs font-bold text-white">KES {selectedContract.escrowAmount.toLocaleString()}</span>
                     <span className={`text-[10px] font-semibold flex items-center space-x-1 ${selectedContract.counterpartyStatus === 'FUNDED' ? 'text-emerald-400' : 'text-orange-400'}`}>
                       {selectedContract.counterpartyId 
                         ? (selectedContract.counterpartyStatus === 'FUNDED' ? '✅ Funded' : '⏳ Awaiting Funding')
@@ -1166,18 +1316,18 @@ export default function WekeleaApp() {
                     <span className="font-bold text-white">{new Date(selectedContract.settlementDeadline).toLocaleDateString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Contract Created:</span>
+                    <span>Agreement Created:</span>
                     <span>{new Date(selectedContract.createdAt).toLocaleDateString()}</span>
                   </div>
                 </div>
 
-                {/* Trash Talk Card */}
-                {selectedContract.trashTalk && (
-                  <div className="p-3 bg-red-950/20 border border-red-900/10 rounded-xl flex items-start space-x-2">
-                    <MessageSquare size={14} className="text-red-400 mt-0.5" />
+                {/* Note Card */}
+                {selectedContract.note && (
+                  <div className="p-3 bg-white/5 border border-white/10 rounded-xl flex items-start space-x-2">
+                    <MessageSquare size={14} className="text-gray-400 mt-0.5" />
                     <div className="flex-1">
-                      <span className="text-[9px] text-red-400 uppercase tracking-widest font-bold">Trash Talk Inbox</span>
-                      <p className="text-xs text-gray-300 italic">“{selectedContract.trashTalk}”</p>
+                      <span className="text-[9px] text-gray-400 uppercase tracking-widest font-bold">Note</span>
+                      <p className="text-xs text-gray-300 italic">“{selectedContract.note}”</p>
                     </div>
                   </div>
                 )}
@@ -1185,12 +1335,12 @@ export default function WekeleaApp() {
                 {/* ACTION ROUTER ACCORDING TO STATE AND USER PERSPECTIVE */}
                 <div className="space-y-3 pt-4">
 
-                  {/* 1. CONTRACT IS AWAITING ACCEPTANCE (Opponent View vs Creator View) */}
+                  {/* 1. AGREEMENT AWAITING ACCEPTANCE (other party vs creator view) */}
                   {selectedContract.status === 'AWAITING_ACCEPTANCE' && (
                     <>
                       {selectedContract.creatorId === currentUser.id ? (
                         <div className="text-center py-2">
-                          <p className="text-xs text-yellow-400 mb-3 font-semibold">Awaiting acceptance by opponent.</p>
+                          <p className="text-xs text-yellow-400 mb-3 font-semibold">Awaiting acceptance by the other party.</p>
                           <button onClick={() => setShowShareModal(true)} className="w-full bg-[#EC7505] hover:bg-[#D84A05] text-black font-bold py-3 px-4 rounded-xl flex items-center justify-center space-x-1 shadow transition">
                             <Share2 size={16} />
                             <span>Share Invitation Link</span>
@@ -1198,15 +1348,15 @@ export default function WekeleaApp() {
                         </div>
                       ) : (
                         <div className="space-y-3 bg-[#EC7505]/5 border border-[#EC7505]/20 p-4 rounded-2xl">
-                          <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2">Accept Challenge Terms</h4>
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2">Accept Agreement Terms</h4>
                           <div className="flex items-start space-x-2 mb-3">
                             <input type="checkbox" id="terms-confirm-box" className="custom-checkbox mt-0.5" defaultChecked />
                             <label htmlFor="terms-confirm-box" className="text-[10px] text-gray-300 leading-snug">
-                              I confirm that the terms above are <strong>objectively verifiable</strong> and represent our agreement. I understand both parties must lock stakes to activate the vault.
+                              I confirm that the terms above are <strong>objectively verifiable</strong> and represent our agreement. I understand both parties must fund the escrow to activate the agreement.
                             </label>
                           </div>
                           <button onClick={() => handleAcceptContract(selectedContract.id)} className="w-full bg-[#EC7505] hover:bg-[#D84A05] text-black font-extrabold py-3 px-4 rounded-xl shadow transition">
-                            Accept Challenge Terms
+                            Accept Agreement Terms
                           </button>
                         </div>
                       )}
@@ -1220,15 +1370,15 @@ export default function WekeleaApp() {
                       {((selectedContract.creatorId === currentUser.id && selectedContract.creatorStatus === 'PENDING_FUND') ||
                         (selectedContract.counterpartyId === currentUser.id && selectedContract.counterpartyStatus === 'PENDING_FUND')) ? (
                         <div className="bg-orange-500/10 border border-orange-500/20 p-4 rounded-2xl space-y-3 text-center">
-                          <p className="text-xs text-orange-400 font-semibold">Your stake of KES {selectedContract.stakeAmount.toLocaleString()} is due to activate the vault escrow.</p>
+                          <p className="text-xs text-orange-400 font-semibold">Your escrow of KES {selectedContract.escrowAmount.toLocaleString()} is due to activate the agreement.</p>
                           <button onClick={() => handleMpesaDepositTrigger(selectedContract)} className="w-full bg-[#EC7505] hover:bg-[#D84A05] text-black font-black py-3 px-4 rounded-xl flex items-center justify-center space-x-1.5 shadow transition">
                             <Wallet size={16} />
-                            <span>Pay Stake via M-Pesa STK</span>
+                            <span>Fund Escrow via M-Pesa STK</span>
                           </button>
                         </div>
                       ) : (
                         <div className="text-center py-3 text-xs text-gray-400 glass rounded-2xl border-white/5">
-                          ⏳ Paid! Awaiting opponent deposit to activate escrow vault.
+                          ⏳ Funded! Awaiting the other party to fund the escrow.
                         </div>
                       )}
                     </div>
@@ -1253,7 +1403,7 @@ export default function WekeleaApp() {
                               {checkedCount}/{totalCount} Met
                             </span>
                           </div>
-                          <p className="text-[10px] text-gray-400">You must check all objective terms to submit a claim for the pot:</p>
+                          <p className="text-[10px] text-gray-400">Check off each condition that has been met to request release of the escrow:</p>
                           
                           <div className="space-y-2 pt-1">
                             {termsListToRender.map((term, index) => (
@@ -1278,13 +1428,13 @@ export default function WekeleaApp() {
                         <button 
                           disabled={!isAllChecked}
                           onClick={() => {
-                            handleClaimWin(selectedContract.id);
+                            handleRequestRelease(selectedContract.id);
                             setClaimChecklist({});
                           }}
                           className={`w-full font-extrabold py-3.5 px-4 rounded-xl shadow transition text-sm uppercase tracking-wider flex items-center justify-center space-x-2 ${isAllChecked ? 'bg-[#EC7505] hover:bg-[#D84A05] text-black active:scale-95' : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'}`}
                         >
                           <Award size={18} />
-                          <span>Claim Win & Request Settlement</span>
+                          <span>Confirm Conditions Met & Request Release</span>
                         </button>
                       </div>
                     );
@@ -1293,9 +1443,9 @@ export default function WekeleaApp() {
                   {/* 4. CLAIM IN PROCESS */}
                   {selectedContract.status === 'CLAIMED' && (
                     <div className="space-y-3">
-                      {selectedContract.claimedById === currentUser.id ? (
+                      {selectedContract.requestedById === currentUser.id ? (
                         <div className="text-center py-3 text-xs text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 rounded-2xl">
-                          ⏳ Claim submitted! Awaiting counterparty settlement approval.
+                          ⏳ Release requested! Awaiting the other party&apos;s approval.
                         </div>
                       ) : (() => {
                         const termsListToRender = selectedContract.termsList && selectedContract.termsList.length > 0
@@ -1309,9 +1459,9 @@ export default function WekeleaApp() {
                         return (
                           <div className="bg-[#EC7505]/5 border border-white/10 p-4 rounded-2xl space-y-4">
                             <div className="text-center space-y-1">
-                              <span className="text-xs text-gray-400 block font-semibold">Counterparty has claimed the win.</span>
-                              <span className="text-sm font-bold text-white">Do you consent to release escrow?</span>
-                              <p className="text-[10px] text-gray-400 mt-1">Verify that each condition was met by checking them off before releasing the pot:</p>
+                              <span className="text-xs text-gray-400 block font-semibold">The other party marked the conditions as met.</span>
+                              <span className="text-sm font-bold text-white">Do you approve releasing the escrow?</span>
+                              <p className="text-[10px] text-gray-400 mt-1">Verify that each condition was met by checking them off before releasing the escrow:</p>
                             </div>
                             
                             <div className="space-y-2 border-t border-b border-white/5 py-3">
@@ -1343,7 +1493,7 @@ export default function WekeleaApp() {
                                 className={`font-black py-3 rounded-xl shadow transition text-xs flex items-center justify-center space-x-1 ${isAllChecked ? 'bg-[#EC7505] hover:bg-[#D84A05] text-black active:scale-95' : 'bg-gray-800 text-gray-500 cursor-not-allowed border border-white/5'}`}
                               >
                                 <Check size={14} />
-                                <span>Consent & Settle</span>
+                                <span>Approve &amp; Release</span>
                               </button>
                               <button onClick={() => setShowDisputeModal(true)} className="bg-red-500/10 hover:bg-red-500/20 text-rose-400 border border-rose-500/30 font-bold py-3 rounded-xl transition text-xs flex items-center justify-center space-x-1">
                                 <X size={14} />
@@ -1364,7 +1514,7 @@ export default function WekeleaApp() {
                         <span>Arbitration Active</span>
                       </div>
                       <p className="text-[11px] text-gray-300 leading-normal">
-                        Settlement rejected. Escrow locked. Wekelea admin is reviewing evidence timeline. Restore ratings by sending verification links.
+                        Release not approved. Escrow is frozen. A Wekelea admin is reviewing the evidence timeline. Restore ratings by sending verification links.
                       </p>
                       
                       {currentUser.id === 'admin' && (
@@ -1384,7 +1534,7 @@ export default function WekeleaApp() {
                         <span>Escrow released!</span>
                       </div>
                       <p className="text-[10px] text-gray-400">
-                        Total Pot KES {selectedContract.totalPot.toLocaleString()} successfully paid out. (Wekelea 5% fee deducted).
+                        Escrow of KES {selectedContract.totalEscrow.toLocaleString()} released to the receiving party. (Wekelea 5% service fee deducted).
                       </p>
                     </div>
                   )}
@@ -1393,7 +1543,7 @@ export default function WekeleaApp() {
                   {selectedContract.status === 'REFUNDED' && (
                     <div className="bg-purple-500/10 border border-purple-500/20 p-4 rounded-2xl text-center">
                       <p className="text-xs text-purple-400 font-semibold">Admin Refund Executed.</p>
-                      <p className="text-[10px] text-gray-400 mt-1">Full stakes of KES {selectedContract.stakeAmount.toLocaleString()} credited back to both participant wallets.</p>
+                      <p className="text-[10px] text-gray-400 mt-1">Full escrow of KES {selectedContract.escrowAmount.toLocaleString()} credited back to both participants&apos; wallets.</p>
                     </div>
                   )}
 
@@ -1448,21 +1598,26 @@ export default function WekeleaApp() {
 
                 <div className="text-center space-y-1">
                   <span className="text-2xl">🤝</span>
-                  <h3 className="text-xl font-black text-white">Challenge Shared!</h3>
-                  <p className="text-xs text-gray-400">Send this link to your opponent. Once they accept terms, deposits activate.</p>
+                  <h3 className="text-xl font-black text-white">Agreement Shared!</h3>
+                  <p className="text-xs text-gray-400">Send this link to the other party. Once they accept the terms, escrow funding activates.</p>
                 </div>
 
-                {/* Mock QR Area */}
+                {/* Scannable QR Code encoding the invite link */}
                 <div className="flex flex-col items-center p-4 bg-white rounded-2xl w-44 h-44 mx-auto relative justify-center shadow-lg">
-                  {/* Generated QR Code Simulation */}
-                  <div className="w-36 h-36 border-4 border-black bg-slate-100 flex flex-col items-center justify-center p-1 rounded-lg">
-                    <span className="text-[10px] font-black text-black tracking-widest text-center uppercase leading-none">Wekelea P2P<br />Escrow Link</span>
-                    <div className="grid grid-cols-6 gap-0.5 mt-2">
-                      {Array.from({ length: 36 }).map((_, i) => (
-                        <div key={i} className={`w-3.5 h-3.5 ${((i * 3) % 4 === 0 || i % 7 === 0) ? 'bg-black' : 'bg-transparent'}`} />
-                      ))}
-                    </div>
-                  </div>
+                  <QRCodeSVG
+                    value={`${window.location.origin}/?contractId=${selectedContract.id}`}
+                    size={144}
+                    level="M"
+                    marginSize={0}
+                    fgColor="#0d0d0f"
+                    bgColor="#ffffff"
+                    imageSettings={{
+                      src: '/assets/logo.png',
+                      height: 30,
+                      width: 30,
+                      excavate: true,
+                    }}
+                  />
                 </div>
 
                 {/* Action button */}
@@ -1472,7 +1627,7 @@ export default function WekeleaApp() {
                     <span>{copiedLink ? 'Copied to Clipboard!' : 'Copy Invitation Link'}</span>
                   </button>
 
-                  <a href={`https://wa.me/?text=${encodeURIComponent(`Accept my escrow challenge on Wekelea: "${selectedContract.title}" with a stake of KES ${selectedContract.stakeAmount}. Link: ${window.location.origin}/?contractId=${selectedContract.id}`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 px-4 rounded-xl transition flex items-center justify-center space-x-1.5 shadow active:scale-95 text-xs uppercase tracking-wider">
+                  <a href={`https://wa.me/?text=${encodeURIComponent(`Join my escrow agreement on Wekelea: "${selectedContract.title}" with an escrow of KES ${selectedContract.escrowAmount}. Link: ${window.location.origin}/?contractId=${selectedContract.id}`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 px-4 rounded-xl transition flex items-center justify-center space-x-1.5 shadow active:scale-95 text-xs uppercase tracking-wider">
                     <span>📱 Share via WhatsApp</span>
                   </a>
                 </div>
@@ -1557,7 +1712,7 @@ export default function WekeleaApp() {
         <form onSubmit={handleCreateContract} className="space-y-5 py-2">
           
           <div className="flex justify-between items-center border-b border-white/10 pb-3">
-            <h2 className="text-xl font-black text-white">New Escrow Contract</h2>
+            <h2 className="text-xl font-black text-white">New Escrow Agreement</h2>
             <button type="button" onClick={() => setCurrentView('dashboard')} className="text-xs font-semibold px-2.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 transition">
               Cancel
             </button>
@@ -1565,9 +1720,9 @@ export default function WekeleaApp() {
 
           {/* Categories */}
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wider">Event Category</label>
+            <label className="text-xs font-bold text-gray-400 block mb-2 uppercase tracking-wider">Agreement Type</label>
             <div className="grid grid-cols-3 gap-2">
-              {(['Sports', 'Gaming', 'Crypto', 'Entertainment', 'Politics', 'Custom'] as EventCategory[]).map((cat) => (
+              {(['Creative Work', 'Freelance', 'Personal Goal', 'Fitness', 'Business', 'Lending', 'Marketplace', 'Deliveries', 'Coaching', 'Community', 'Custom'] as AgreementCategory[]).map((cat) => (
                 <button key={cat} type="button" onClick={() => setNewCategory(cat)} className={`py-3 px-2 rounded-xl text-xs font-bold border transition flex flex-col items-center space-y-1 ${newCategory === cat ? 'bg-[#EC7505]/15 border-[#EC7505] text-[#EC7505]' : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10'}`}>
                   <span className="text-lg">{getCategoryIcon(cat)}</span>
                   <span>{cat}</span>
@@ -1582,7 +1737,7 @@ export default function WekeleaApp() {
             <input 
               id="new-contract-title"
               type="text" 
-              placeholder="e.g. Arsenal beats Manchester United"
+              placeholder="e.g. Logo design for my cafe"
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               className="input-field text-sm"
@@ -1611,7 +1766,7 @@ export default function WekeleaApp() {
                   <span className="text-xs font-bold text-[#D4AF37] min-w-[16px]">{index + 1}.</span>
                   <input 
                     type="text"
-                    placeholder={`e.g. Condition ${index + 1} (e.g. Must win by 2+ goals)`}
+                    placeholder={`e.g. Condition ${index + 1} (e.g. Deliver 3 logo concepts by Friday)`}
                     value={term}
                     onChange={(e) => {
                       const updated = [...newTermsList];
@@ -1636,72 +1791,72 @@ export default function WekeleaApp() {
                 </div>
               ))}
             </div>
-            <span className="text-[10px] text-gray-500 block mt-1">Specify clear, measurable rules. These will form the checklist both players must confirm upon settlement.</span>
+            <span className="text-[10px] text-gray-500 block mt-1">Specify clear, measurable conditions. These will form the checklist both parties must confirm before release.</span>
           </div>
 
-          {/* Stake Amount Sliders */}
+          {/* Escrow Amount Slider */}
           <div>
             <div className="flex justify-between items-baseline mb-1">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Individual Stake Amount</label>
-              <span className="text-lg font-black text-[#EC7505]">KES {Number(newStake).toLocaleString()}</span>
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Escrow Amount (each party)</label>
+              <span className="text-lg font-black text-[#EC7505]">KES {Number(newEscrow).toLocaleString()}</span>
             </div>
-            <input 
+            <input
               id="new-contract-stake"
               type="range" 
               min="100" 
               max="10000" 
               step="100"
-              value={newStake}
-              onChange={(e) => setNewStake(e.target.value)}
+              value={newEscrow}
+              onChange={(e) => setNewEscrow(e.target.value)}
               className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-[#EC7505]"
             />
             <div className="flex justify-between text-[9px] text-gray-500 pt-1 font-bold">
               <span>MIN: KES 100</span>
-              <span>Total pot locked inside Escrow: <strong className="text-white font-extrabold text-xs">KES {(Number(newStake)*2).toLocaleString()}</strong></span>
+              <span>Total held in escrow: <strong className="text-white font-extrabold text-xs">KES {(Number(newEscrow)*2).toLocaleString()}</strong></span>
               <span>MAX: KES 10,000</span>
             </div>
           </div>
 
-          {/* Challenge a specific user */}
+          {/* Invite a specific user */}
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-1 uppercase tracking-wider">Challenge Opponent (Username)</label>
-            <input 
+            <label className="text-xs font-bold text-gray-400 block mb-1 uppercase tracking-wider">Other Party (Username)</label>
+            <input
               id="new-contract-opponent"
-              type="text" 
-              placeholder="e.g. Mwende_Vibe (or leave empty for public challenge)"
+              type="text"
+              placeholder="e.g. Mwende_Vibe (or leave empty for a public agreement)"
               value={newCounterparty}
               onChange={(e) => setNewCounterparty(e.target.value)}
               className="input-field text-sm"
             />
-            <span className="text-[10px] text-gray-500 block mt-1">If blank, any user can accept this contract from the public feed.</span>
+            <span className="text-[10px] text-gray-500 block mt-1">If blank, any user can accept this agreement from the public feed.</span>
           </div>
 
           {/* Advanced Accordion Toggle */}
           <div className="border border-white/5 rounded-2xl p-4 bg-white/5 space-y-4">
-            <span className="text-xs font-bold text-gray-300 block uppercase tracking-wider">Advanced Vault Settings</span>
-            
-            {/* Trusted Source Link */}
+            <span className="text-xs font-bold text-gray-300 block uppercase tracking-wider">Advanced Escrow Settings</span>
+
+            {/* Verification Source Link */}
             <div>
-              <label className="text-[10px] text-gray-400 block mb-1 uppercase font-bold">Trusted Source Link</label>
-              <input 
+              <label className="text-[10px] text-gray-400 block mb-1 uppercase font-bold">Verification Source Link</label>
+              <input
                 id="new-contract-reference"
-                type="url" 
-                placeholder="e.g. https://www.premierleague.com"
+                type="url"
+                placeholder="e.g. link to the brief, contract, or evidence source"
                 value={newTrustedSource}
                 onChange={(e) => setNewTrustedSource(e.target.value)}
                 className="input-field text-xs pl-3"
               />
             </div>
 
-            {/* Trash Talk */}
+            {/* Optional note */}
             <div>
-              <label className="text-[10px] text-gray-400 block mb-1 uppercase font-bold">Attach trash talk / banter</label>
-              <input 
+              <label className="text-[10px] text-gray-400 block mb-1 uppercase font-bold">Attach a note (optional)</label>
+              <input
                 id="new-contract-trashtalk"
-                type="text" 
-                placeholder="e.g. Get ready to pay for my Friday drinks!"
-                value={newTrashTalk}
-                onChange={(e) => setNewTrashTalk(e.target.value)}
+                type="text"
+                placeholder="e.g. Looking forward to working with you!"
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
                 className="input-field text-xs"
               />
             </div>
@@ -1748,7 +1903,7 @@ export default function WekeleaApp() {
           <div className="glass p-5 rounded-3xl border-white/5 space-y-4">
             <div className="space-y-1">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Instant M-Pesa Cashout</span>
-              <p className="text-[11px] text-gray-500">Funds transfer directly to your phone +{currentUser.phone} via M-Pesa B2C payout channel.</p>
+              <p className="text-[11px] text-gray-500">Funds transfer directly to your phone +{currentUser.phone} via M-Pesa B2C withdrawal channel.</p>
             </div>
             
             <form onSubmit={handleWithdrawFunds} className="space-y-4">
@@ -1861,7 +2016,7 @@ export default function WekeleaApp() {
                         <input 
                           id="admin-resolution-notes"
                           type="text" 
-                          placeholder="State resolution logic, e.g. Checked official Premier League score..."
+                          placeholder="State resolution logic, e.g. Reviewed the delivered work against the agreed conditions..."
                           value={adminResolutionNotes}
                           onChange={(e) => setAdminResolutionNotes(e.target.value)}
                           className="input-field text-xs pl-3"
@@ -1869,18 +2024,32 @@ export default function WekeleaApp() {
                         />
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
-                        {/* Simulate favors for u1, u2, u3, u4 dynamically depending on creator/counterparty */}
-                        <button onClick={() => handleAdminResolve(dispute.id, 'u1')} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded text-[10px] transition">
-                          Settle Mwangi (Creator)
-                        </button>
-                        <button onClick={() => handleAdminResolve(dispute.id, 'u2')} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded text-[10px] transition">
-                          Settle Mwende (Opponent)
-                        </button>
-                        <button onClick={() => handleAdminRefund(dispute.id)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded text-[10px] transition">
-                          Refund Both (Split)
-                        </button>
-                      </div>
+                      {(() => {
+                        const disputeContract = contractsByDispute[dispute.id];
+                        const creator = disputeContract ? usersById[disputeContract.creatorId] : undefined;
+                        const counterparty = disputeContract?.counterpartyId ? usersById[disputeContract.counterpartyId] : undefined;
+                        return (
+                          <div className="grid grid-cols-3 gap-2">
+                            <button
+                              onClick={() => disputeContract && handleAdminResolve(dispute.id, disputeContract.creatorId)}
+                              disabled={!disputeContract}
+                              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-2 rounded text-[10px] transition"
+                            >
+                              Release to {creator?.username ?? 'Creator'} (Creator)
+                            </button>
+                            <button
+                              onClick={() => disputeContract?.counterpartyId && handleAdminResolve(dispute.id, disputeContract.counterpartyId)}
+                              disabled={!disputeContract?.counterpartyId}
+                              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-2 rounded text-[10px] transition"
+                            >
+                              Release to {counterparty?.username ?? 'Other Party'} (Other Party)
+                            </button>
+                            <button onClick={() => handleAdminRefund(dispute.id)} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 rounded text-[10px] transition">
+                              Refund Both (Split)
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
 

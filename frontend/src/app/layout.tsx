@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Wekelea — Peer-to-Peer Social Escrow Contract Platform',
-  description: 'Put your money where your mouth is. Settle arguments instantly and securely with conditional escrow contracts funded by M-Pesa.',
-  keywords: 'escrow, peer-to-peer, contracts, M-Pesa, Kenya, social challenges, secure payments',
+  title: 'Wekelea — Programmable Escrow for Agreements',
+  description: 'Wekelea securely holds funds in escrow and releases them only when agreed conditions are met. Conditional payments for freelance work, personal goals, business deals and more — funded by M-Pesa.',
+  keywords: 'escrow, peer-to-peer, agreements, conditional payments, M-Pesa, Kenya, freelance, milestones, secure payments',
   authors: [{ name: 'Wekelea Team' }],
 };
 

@@ -1,0 +1,13 @@
+# Netlify config for the Wekelea monorepo.
+# The deployable app is the Next.js project in frontend/ (frontend + API routes).
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Official Next.js runtime — handles SSR, API route handlers, and image optimization.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

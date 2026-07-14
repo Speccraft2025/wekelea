@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:5001/api';
+// The API now lives in the same Next.js app (serverless route handlers under /api).
+const API_URL = '/api';
+
 
 export interface User {
   id: string;
@@ -21,12 +23,17 @@ export type ContractStatus =
   | 'DISPUTED'
   | 'REFUNDED';
 
-export type EventCategory =
-  | 'Sports'
-  | 'Gaming'
-  | 'Politics'
-  | 'Entertainment'
-  | 'Crypto'
+export type AgreementCategory =
+  | 'Creative Work'
+  | 'Freelance'
+  | 'Personal Goal'
+  | 'Fitness'
+  | 'Business'
+  | 'Lending'
+  | 'Marketplace'
+  | 'Deliveries'
+  | 'Coaching'
+  | 'Community'
   | 'Custom';
 
 export type PrivacySetting = 'Public' | 'Friends' | 'Private';
@@ -34,11 +41,11 @@ export type PrivacySetting = 'Public' | 'Friends' | 'Private';
 export interface Contract {
   id: string;
   title: string;
-  category: EventCategory;
+  category: AgreementCategory;
   terms: string;
   termsList: string[];
-  stakeAmount: number;
-  totalPot: number;
+  escrowAmount: number;
+  totalEscrow: number;
   creatorId: string;
   counterpartyId?: string;
   creatorStatus: 'PENDING_FUND' | 'FUNDED';
@@ -48,10 +55,10 @@ export interface Contract {
   settlementDeadline: string;
   expirationDate: string;
   trustedSource?: string;
-  trashTalk?: string;
+  note?: string;
   privacy: PrivacySetting;
-  winnerId?: string;
-  claimedById?: string;
+  recipientId?: string;
+  requestedById?: string;
   disputeId?: string;
   createdAt: string;
   updatedAt: string;
@@ -186,21 +193,21 @@ export class WekeleaAPI {
     });
   }
 
-  static async claimWin(contractId: string, userId: string): Promise<Contract> {
+  static async requestRelease(contractId: string, userId: string): Promise<Contract> {
     return this.request<Contract>(`/contracts/${contractId}/claim`, {
       method: 'POST',
       body: JSON.stringify({ userId })
     });
   }
 
-  static async approveSettlement(contractId: string, userId: string): Promise<Contract> {
+  static async approveRelease(contractId: string, userId: string): Promise<Contract> {
     return this.request<Contract>(`/contracts/${contractId}/settle`, {
       method: 'POST',
       body: JSON.stringify({ userId })
     });
   }
 
-  static async disputeClaim(contractId: string, userId: string, reason: string): Promise<Contract> {
+  static async disputeRelease(contractId: string, userId: string, reason: string): Promise<Contract> {
     return this.request<Contract>(`/contracts/${contractId}/dispute`, {
       method: 'POST',
       body: JSON.stringify({ userId, reason })
@@ -228,10 +235,10 @@ export class WekeleaAPI {
     return this.request<Dispute[]>('/disputes');
   }
 
-  static async adminResolveDispute(disputeId: string, winnerId: string, notes: string): Promise<Dispute> {
+  static async adminResolveDispute(disputeId: string, recipientId: string, notes: string): Promise<Dispute> {
     return this.request<Dispute>(`/disputes/${disputeId}/resolve`, {
       method: 'POST',
-      body: JSON.stringify({ winnerId, notes })
+      body: JSON.stringify({ recipientId, notes })
     });
   }
 
