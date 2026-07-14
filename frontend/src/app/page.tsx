@@ -92,6 +92,7 @@ export default function WekeleaApp() {
   const [pendingCheckoutId, setPendingCheckoutId] = useState<string | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [mpesaError, setMpesaError] = useState<string | null>(null);
+  const [mpesaStatusMsg, setMpesaStatusMsg] = useState<string | null>(null);
 
   const [isConnected, setIsConnected] = useState(false);
 
@@ -395,50 +396,80 @@ export default function WekeleaApp() {
     setShowMpesaPrompt(true);
   };
 
-  const executeSimulatedMpesaSTK = async () => {
-    if (!currentUser || !selectedContract) return;
+  const executeMpesaSTK = async () => {
+    if (!currentUser) return;
+
+    // Contract-funding flow when an agreement is open; otherwise a plain wallet top-up.
+    const contractId = selectedContract?.id;
+    const userId = currentUser.id;
+    const amount = mpesaAmount;
+    const balanceBefore = currentUser.walletBalance;
 
     setIsProcessingPayment(true);
     setMpesaError(null);
+    setMpesaStatusMsg('Sending payment request…');
+
+    // Once the wallet is credited: if funding an agreement, lock the funds into escrow.
+    const finishFund = async () => {
+      if (contractId) {
+        const updated = await WekeleaAPI.fundContract(contractId, userId);
+        setSelectedContract(updated);
+      }
+      const freshUser = await WekeleaAPI.getUser(userId);
+      setCurrentUser(freshUser);
+      localStorage.setItem('wekelea_user', JSON.stringify(freshUser));
+      setIsProcessingPayment(false);
+      setShowMpesaPrompt(false);
+      setPendingCheckoutId(null);
+      setMpesaStatusMsg(null);
+    };
 
     try {
-      // 1. Trigger pending transaction creation
-      const res = await WekeleaAPI.initiateSTKPush({
-        phone: mpesaPhone,
-        amount: mpesaAmount,
-        contractId: selectedContract.id,
-        userId: currentUser.id
-      });
-
+      const res = await WekeleaAPI.initiateSTKPush({ phone: mpesaPhone, amount, contractId: contractId || 'wallet_topup', userId });
       setPendingCheckoutId(res.CheckoutRequestID);
 
-      // Simulate a brief delay representing Safaricom prompt arrival and user PIN input
-      setTimeout(async () => {
+      if (res.simulated) {
+        // Demo mode (no Daraja keys): auto-confirm the payment.
+        setMpesaStatusMsg('Confirming payment…');
+        setTimeout(async () => {
+          try {
+            await WekeleaAPI.triggerCallback(res.CheckoutRequestID, true);
+            await finishFund();
+          } catch (e: any) {
+            setMpesaError('Confirmation failed: ' + e.message);
+            setIsProcessingPayment(false);
+          }
+        }, 3000);
+        return;
+      }
+
+      // REAL Daraja: the STK prompt is now on the user's phone. Safaricom will call
+      // our callback when they enter their PIN; poll the wallet until it's credited.
+      setMpesaStatusMsg(`Check your phone 📲 — enter your M-Pesa PIN to approve KES ${amount.toLocaleString()}.`);
+      const target = balanceBefore + amount - 0.01;
+      const deadline = Date.now() + 90000; // wait up to 90s for the callback
+      const poll = async () => {
         try {
-          // 2. Trigger simulated callback response (success)
-          await WekeleaAPI.triggerCallback(res.CheckoutRequestID, true);
-          
-          // 3. Immediately fund the escrow on the agreement
-          const updated = await WekeleaAPI.fundContract(selectedContract.id, currentUser.id);
-          setSelectedContract(updated);
-
-          // Update user wallet balance locally
-          const freshUser = await WekeleaAPI.getUser(currentUser.id);
-          setCurrentUser(freshUser);
-          localStorage.setItem('wekelea_user', JSON.stringify(freshUser));
-
+          const u = await WekeleaAPI.getUser(userId);
+          if (u.walletBalance >= target) {
+            setCurrentUser(u);
+            await finishFund();
+            return;
+          }
+        } catch { /* transient — keep polling */ }
+        if (Date.now() > deadline) {
+          setMpesaError('No confirmation received yet. If you approved on your phone, your wallet will update shortly — otherwise try again.');
           setIsProcessingPayment(false);
-          setShowMpesaPrompt(false);
-          setPendingCheckoutId(null);
-        } catch (e: any) {
-          setMpesaError('Callback execution failed: ' + e.message);
-          setIsProcessingPayment(false);
+          setMpesaStatusMsg(null);
+          return;
         }
-      }, 3500);
-
+        setTimeout(poll, 3000);
+      };
+      setTimeout(poll, 4000);
     } catch (err: any) {
-      setMpesaError(err.message || 'M-Pesa STK trigger failed');
+      setMpesaError(err.message || 'M-Pesa STK request failed');
       setIsProcessingPayment(false);
+      setMpesaStatusMsg(null);
     }
   };
 
@@ -1646,24 +1677,20 @@ export default function WekeleaApp() {
                     <span className="w-3.5 h-3.5 bg-emerald-600 rounded-full flex items-center justify-center text-[8px] text-white font-bold">M</span>
                     <span className="text-xs font-black uppercase text-emerald-600 tracking-wider">M-Pesa STK Push</span>
                   </div>
-                  <span className="text-[10px] text-gray-500 font-semibold">SIM Prompt</span>
+                  <span className="text-[10px] text-gray-500 font-semibold">Secure</span>
                 </div>
 
                 {isProcessingPayment ? (
                   <div className="py-6 flex flex-col items-center space-y-4 text-center">
-                    {pendingCheckoutId ? (
-                      <>
-                        <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
-                        <div className="space-y-1">
-                          <p className="text-sm font-bold text-gray-800">Processing Escrow Deposit</p>
-                          <p className="text-[11px] text-gray-500">Authenticating transaction ref: <br /><span className="font-mono text-xs font-semibold text-emerald-700">{pendingCheckoutId}</span></p>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                        <p className="text-xs text-gray-600">Contacting Safaricom Daraja API gateway...</p>
-                      </>
+                    <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                    <div className="space-y-1.5">
+                      <p className="text-sm font-bold text-gray-800 leading-snug">{mpesaStatusMsg || 'Processing…'}</p>
+                      {pendingCheckoutId && (
+                        <p className="text-[9px] text-gray-400 font-mono break-all">{pendingCheckoutId}</p>
+                      )}
+                    </div>
+                    {mpesaError && (
+                      <p className="text-[10px] text-red-600 font-semibold bg-red-100 p-2 rounded-lg">{mpesaError}</p>
                     )}
                   </div>
                 ) : (
@@ -1675,26 +1702,19 @@ export default function WekeleaApp() {
                       <p className="text-gray-800 font-medium">Phone: <span className="font-bold text-black">+{mpesaPhone}</span></p>
                     </div>
 
+                    <p className="text-[10px] text-gray-500 text-center leading-snug">
+                      An M-Pesa prompt will be sent to <span className="font-bold">+{mpesaPhone}</span>. Enter your PIN on your phone to approve and fund the escrow.
+                    </p>
+
                     {mpesaError && (
                       <p className="text-[10px] text-red-600 font-semibold bg-red-100 p-2 rounded-lg">{mpesaError}</p>
                     )}
 
-                    <div className="space-y-2">
-                      <label className="text-[10px] text-gray-500 block uppercase font-bold">Simulate M-Pesa SIM PIN entry</label>
-                      <input 
-                        type="password" 
-                        placeholder="••••" 
-                        maxLength={4} 
-                        className="w-full text-center tracking-widest text-lg font-bold bg-white border border-gray-300 rounded-lg p-2 focus:outline-none focus:border-emerald-600 text-black"
-                        defaultValue="1234"
-                      />
-                    </div>
-
                     <div className="grid grid-cols-2 gap-2">
-                      <button onClick={executeSimulatedMpesaSTK} className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 rounded-xl text-xs shadow-md transition">
-                        Confirm PIN
+                      <button onClick={executeMpesaSTK} className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 rounded-xl text-xs shadow-md transition">
+                        Send M-Pesa Prompt
                       </button>
-                      <button onClick={() => setShowMpesaPrompt(false)} className="bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold py-2.5 rounded-xl text-xs transition">
+                      <button onClick={() => { setShowMpesaPrompt(false); setMpesaError(null); }} className="bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold py-2.5 rounded-xl text-xs transition">
                         Cancel
                       </button>
                     </div>

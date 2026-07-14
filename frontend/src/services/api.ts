@@ -215,8 +215,8 @@ export class WekeleaAPI {
   }
 
   // --- M-Pesa Simulated STK Trigger ---
-  static async initiateSTKPush(payload: { phone: string; amount: number; contractId: string; userId: string }): Promise<{ MerchantRequestID: string; CheckoutRequestID: string; ResponseCode: string; ResponseDescription: string }> {
-    return this.request<{ MerchantRequestID: string; CheckoutRequestID: string; ResponseCode: string; ResponseDescription: string }>('/payments/stkpush', {
+  static async initiateSTKPush(payload: { phone: string; amount: number; contractId: string; userId: string }): Promise<{ MerchantRequestID: string; CheckoutRequestID: string; ResponseCode: string; ResponseDescription: string; simulated?: boolean }> {
+    return this.request<{ MerchantRequestID: string; CheckoutRequestID: string; ResponseCode: string; ResponseDescription: string; simulated?: boolean }>('/payments/stkpush', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
