@@ -210,10 +210,11 @@ export default function WekeleaApp() {
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 4000); // Poll every 4s for backup sync
+    // Supabase Realtime drives live updates; this is just a gentle backup sync.
+    const interval = setInterval(fetchData, 15000);
 
     return () => clearInterval(interval);
-  }, [currentUser, selectedContract?.id]);
+  }, [currentUser?.id, selectedContract?.id]);
 
   // Live updates via Supabase Realtime. If Supabase isn't configured in the
   // browser, this is a no-op and the 4s polling effect above keeps things fresh.
