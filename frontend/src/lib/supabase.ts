@@ -18,14 +18,12 @@ export function supabaseAdmin(): SupabaseClient {
     );
   }
 
+  // NOTE: do NOT wrap fetch with `cache: 'no-store'` here — that breaks undici's
+  // fetch in Netlify's Lambda runtime ("TypeError: fetch failed"). Fresh reads are
+  // guaranteed instead by `export const dynamic = 'force-dynamic'` on every route,
+  // which forces all fetches in the handler to bypass Next.js's data cache.
   adminClient = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: {
-      // supabase-js uses fetch under the hood; Next.js caches fetch by default,
-      // which would serve stale reads. Force every request to bypass the cache.
-      fetch: (input: RequestInfo | URL, init?: RequestInit) =>
-        fetch(input, { ...init, cache: 'no-store' }),
-    },
   });
   return adminClient;
 }
