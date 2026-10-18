@@ -81,9 +81,55 @@ export interface Notification {
   title: string;
   message: string;
   contractId?: string;
-  type: 'CONTRACT_INVITE' | 'CONTRACT_ACTIVE' | 'CLAIM_MADE' | 'DISPUTE_OPENED' | 'SETTLEMENT_APPROVED' | 'ADMIN_ACTION';
+  type:
+    | 'CONTRACT_INVITE' | 'CONTRACT_ACTIVE' | 'CLAIM_MADE' | 'DISPUTE_OPENED'
+    | 'SETTLEMENT_APPROVED' | 'ADMIN_ACTION'
+    | 'CAMPAIGN_ACTIVE' | 'CAMPAIGN_SUBMISSION' | 'CAMPAIGN_PAYOUT' | 'CAMPAIGN_REJECTED';
   read: boolean;
   createdAt: string;
+}
+
+// --- One-to-Many: Campaigns (creator economy) -------------------------------
+
+export type CampaignStatus = 'AWAITING_FUNDING' | 'ACTIVE' | 'CLOSED';
+export type SubmissionStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+export type CampaignPlatform = 'TikTok' | 'Instagram' | 'YouTube' | 'X' | 'Other';
+
+export interface Campaign {
+  id: string;
+  sponsorId: string;
+  title: string;
+  brief: string;
+  category: AgreementCategory;
+  platform: CampaignPlatform;
+  requirements: string[];
+  ratePer1000: number;
+  minViews: number;
+  budget: number;
+  budgetRemaining: number;
+  status: CampaignStatus;
+  deadline: string;
+  trustedSource?: string;
+  privacy: PrivacySetting;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CampaignSubmission {
+  id: string;
+  campaignId: string;
+  creatorId: string;
+  postUrl: string;
+  proofLink?: string;
+  note?: string;
+  claimedViews: number;
+  verifiedViews: number;
+  payoutAmount: number;
+  status: SubmissionStatus;
+  reviewNotes?: string;
+  reviewedById?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Dispute {
@@ -246,6 +292,65 @@ export class WekeleaAPI {
     return this.request<Dispute>(`/disputes/${disputeId}/refund`, {
       method: 'POST',
       body: JSON.stringify({ notes })
+    });
+  }
+
+  // --- Campaigns (One-to-Many) ---
+  static async getCampaigns(sponsorId?: string): Promise<Campaign[]> {
+    const query = sponsorId ? `?sponsorId=${sponsorId}` : '';
+    return this.request<Campaign[]>(`/campaigns${query}`);
+  }
+
+  static async getCampaign(id: string): Promise<{ campaign: Campaign; submissions: CampaignSubmission[] }> {
+    return this.request<{ campaign: Campaign; submissions: CampaignSubmission[] }>(`/campaigns/${id}`);
+  }
+
+  static async getMySubmissions(creatorId: string): Promise<CampaignSubmission[]> {
+    return this.request<CampaignSubmission[]>(`/campaigns/submissions?creatorId=${creatorId}`);
+  }
+
+  static async createCampaign(payload: Partial<Campaign> & { sponsorId: string }): Promise<Campaign> {
+    return this.request<Campaign>('/campaigns', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async fundCampaign(campaignId: string, userId: string): Promise<Campaign> {
+    return this.request<Campaign>(`/campaigns/${campaignId}/fund`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  static async closeCampaign(campaignId: string, userId: string): Promise<Campaign> {
+    return this.request<Campaign>(`/campaigns/${campaignId}/close`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  static async submitToCampaign(
+    campaignId: string,
+    payload: { userId: string; postUrl: string; proofLink?: string; claimedViews?: number; note?: string },
+  ): Promise<CampaignSubmission> {
+    return this.request<CampaignSubmission>(`/campaigns/${campaignId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async approveSubmission(submissionId: string, userId: string, verifiedViews: number, notes: string): Promise<CampaignSubmission> {
+    return this.request<CampaignSubmission>(`/campaigns/submissions/${submissionId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, verifiedViews, notes }),
+    });
+  }
+
+  static async rejectSubmission(submissionId: string, userId: string, notes: string): Promise<CampaignSubmission> {
+    return this.request<CampaignSubmission>(`/campaigns/submissions/${submissionId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, notes }),
     });
   }
 

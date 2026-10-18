@@ -66,10 +66,56 @@ export interface Notification {
   userId: string;
   title: string;
   message: string;
-  contractId?: string;
-  type: 'CONTRACT_INVITE' | 'CONTRACT_ACTIVE' | 'CLAIM_MADE' | 'DISPUTE_OPENED' | 'SETTLEMENT_APPROVED' | 'ADMIN_ACTION';
+  contractId?: string;      // also carries a campaignId for campaign notifications
+  type:
+    | 'CONTRACT_INVITE' | 'CONTRACT_ACTIVE' | 'CLAIM_MADE' | 'DISPUTE_OPENED'
+    | 'SETTLEMENT_APPROVED' | 'ADMIN_ACTION'
+    | 'CAMPAIGN_ACTIVE' | 'CAMPAIGN_SUBMISSION' | 'CAMPAIGN_PAYOUT' | 'CAMPAIGN_REJECTED';
   read: boolean;
   createdAt: string;
+}
+
+// --- One-to-Many: Campaigns (creator economy) -------------------------------
+
+export type CampaignStatus = 'AWAITING_FUNDING' | 'ACTIVE' | 'CLOSED';
+export type SubmissionStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+export type CampaignPlatform = 'TikTok' | 'Instagram' | 'YouTube' | 'X' | 'Other';
+
+export interface Campaign {
+  id: string;
+  sponsorId: string;
+  title: string;
+  brief: string;
+  category: AgreementCategory;
+  platform: CampaignPlatform;
+  requirements: string[];
+  ratePer1000: number;        // KES paid per 1,000 verified views
+  minViews: number;           // minimum verified views for a submission to qualify
+  budget: number;             // total KES committed to escrow
+  budgetRemaining: number;    // KES still available to pay out
+  status: CampaignStatus;
+  deadline: string;
+  trustedSource?: string;
+  privacy: PrivacySetting;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CampaignSubmission {
+  id: string;
+  campaignId: string;
+  creatorId: string;
+  postUrl: string;
+  proofLink?: string;
+  note?: string;
+  claimedViews: number;
+  verifiedViews: number;
+  payoutAmount: number;       // net KES paid to the creator
+  status: SubmissionStatus;
+  reviewNotes?: string;
+  reviewedById?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Dispute {

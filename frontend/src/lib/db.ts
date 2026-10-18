@@ -1,5 +1,8 @@
 import { supabaseAdmin } from './supabase';
-import { User, Contract, Transaction, Notification, Dispute, AgreementCategory, PrivacySetting } from './types';
+import {
+  User, Contract, Transaction, Notification, Dispute, AgreementCategory, PrivacySetting,
+  Campaign, CampaignSubmission, CampaignPlatform, CampaignStatus, SubmissionStatus,
+} from './types';
 
 // --- Row → domain mappers ---------------------------------------------------
 
@@ -85,6 +88,47 @@ export function rowToDispute(r: any): Dispute {
     resolvedById: r.resolved_by_id ?? undefined,
     createdAt: iso(r.created_at),
     resolvedAt: r.resolved_at ? iso(r.resolved_at) : undefined,
+  };
+}
+
+export function rowToCampaign(r: any): Campaign {
+  return {
+    id: r.id,
+    sponsorId: r.sponsor_id,
+    title: r.title,
+    brief: r.brief ?? '',
+    category: r.category as AgreementCategory,
+    platform: r.platform as CampaignPlatform,
+    requirements: r.requirements ?? [],
+    ratePer1000: num(r.rate_per_1000),
+    minViews: num(r.min_views),
+    budget: num(r.budget),
+    budgetRemaining: num(r.budget_remaining),
+    status: r.status as CampaignStatus,
+    deadline: r.deadline ?? '',
+    trustedSource: r.trusted_source ?? undefined,
+    privacy: r.privacy as PrivacySetting,
+    createdAt: iso(r.created_at),
+    updatedAt: iso(r.updated_at),
+  };
+}
+
+export function rowToSubmission(r: any): CampaignSubmission {
+  return {
+    id: r.id,
+    campaignId: r.campaign_id,
+    creatorId: r.creator_id,
+    postUrl: r.post_url,
+    proofLink: r.proof_link ?? undefined,
+    note: r.note ?? undefined,
+    claimedViews: num(r.claimed_views),
+    verifiedViews: num(r.verified_views),
+    payoutAmount: num(r.payout_amount),
+    status: r.status as SubmissionStatus,
+    reviewNotes: r.review_notes ?? undefined,
+    reviewedById: r.reviewed_by_id ?? undefined,
+    createdAt: iso(r.created_at),
+    updatedAt: iso(r.updated_at),
   };
 }
 
@@ -250,6 +294,70 @@ export async function confirmDeposit(checkoutId: string, success: boolean, mpesa
   const row = Array.isArray(data) ? data[0] : data;
   return row ? rowToTransaction(row) : null;
 }
+
+// --- Campaigns (One-to-Many) ------------------------------------------------
+
+export async function getCampaigns(opts?: { sponsorId?: string }): Promise<Campaign[]> {
+  const sb = supabaseAdmin();
+  let query = sb.from('campaigns').select('*').order('created_at', { ascending: false });
+  if (opts?.sponsorId) {
+    query = query.eq('sponsor_id', opts.sponsorId);
+  } else {
+    query = query.neq('privacy', 'Private');
+  }
+  const { data, error } = await query;
+  fail('getCampaigns', error);
+  return (data ?? []).map(rowToCampaign);
+}
+
+export async function getCampaign(id: string): Promise<Campaign | null> {
+  const { data, error } = await supabaseAdmin().from('campaigns').select('*').eq('id', id).maybeSingle();
+  fail('getCampaign', error);
+  return data ? rowToCampaign(data) : null;
+}
+
+/** Submissions for one campaign, or (with creatorId) a creator's own across all campaigns. */
+export async function getSubmissions(opts: { campaignId?: string; creatorId?: string }): Promise<CampaignSubmission[]> {
+  const sb = supabaseAdmin();
+  let query = sb.from('campaign_submissions').select('*').order('created_at', { ascending: false });
+  if (opts.campaignId) query = query.eq('campaign_id', opts.campaignId);
+  if (opts.creatorId) query = query.eq('creator_id', opts.creatorId);
+  const { data, error } = await query;
+  fail('getSubmissions', error);
+  return (data ?? []).map(rowToSubmission);
+}
+
+export async function insertCampaign(c: Campaign): Promise<Campaign> {
+  const { data, error } = await supabaseAdmin().from('campaigns').insert({
+    id: c.id, sponsor_id: c.sponsorId, title: c.title, brief: c.brief, category: c.category,
+    platform: c.platform, requirements: c.requirements, rate_per_1000: c.ratePer1000,
+    min_views: c.minViews, budget: c.budget, budget_remaining: 0, status: 'AWAITING_FUNDING',
+    deadline: c.deadline, trusted_source: c.trustedSource ?? null, privacy: c.privacy,
+  }).select('*').single();
+  fail('insertCampaign', error);
+  return rowToCampaign(data);
+}
+
+export const fundCampaign = (campaignId: string, sponsorId: string) =>
+  rpcOne('fund_campaign', { p_campaign_id: campaignId, p_sponsor_id: sponsorId }, rowToCampaign);
+
+export const submitToCampaign = (
+  campaignId: string, creatorId: string, postUrl: string, proofLink: string, claimedViews: number, note: string,
+) => rpcOne('submit_to_campaign', {
+  p_campaign_id: campaignId, p_creator_id: creatorId, p_post_url: postUrl,
+  p_proof_link: proofLink, p_claimed_views: claimedViews, p_note: note,
+}, rowToSubmission);
+
+export const approveSubmission = (submissionId: string, reviewerId: string, verifiedViews: number, notes: string) =>
+  rpcOne('approve_submission', {
+    p_submission_id: submissionId, p_reviewer_id: reviewerId, p_verified_views: verifiedViews, p_notes: notes,
+  }, rowToSubmission);
+
+export const rejectSubmission = (submissionId: string, reviewerId: string, notes: string) =>
+  rpcOne('reject_submission', { p_submission_id: submissionId, p_reviewer_id: reviewerId, p_notes: notes }, rowToSubmission);
+
+export const closeCampaign = (campaignId: string, sponsorId: string) =>
+  rpcOne('close_campaign', { p_campaign_id: campaignId, p_sponsor_id: sponsorId }, rowToCampaign);
 
 export async function resetDatabase(): Promise<void> {
   const { error } = await supabaseAdmin().rpc('reset_wekelea');

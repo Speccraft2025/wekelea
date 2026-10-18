@@ -32,6 +32,7 @@ import { WekeleaAPI, User, Contract, Dispute, Transaction, Notification, Agreeme
 import { supabaseBrowser } from '../lib/supabaseBrowser';
 import dynamic from 'next/dynamic';
 import { QRCodeSVG } from 'qrcode.react';
+import CampaignHub from '../components/CampaignHub';
 
 const ThreeDSplashScreen = dynamic(() => import('../components/ThreeDSplashScreen'), {
   ssr: false
@@ -51,7 +52,7 @@ export default function WekeleaApp() {
   const [contractsByDispute, setContractsByDispute] = useState<Record<string, Contract>>({});
 
   // Active UI views
-  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'create-contract' | 'wallet' | 'admin' | 'dispute-details'>('landing');
+  const [currentView, setCurrentView] = useState<'landing' | 'dashboard' | 'create-contract' | 'wallet' | 'admin' | 'dispute-details' | 'campaigns'>('landing');
   const [activeTab, setActiveTab] = useState<'active' | 'pending' | 'completed'>('active');
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
@@ -482,6 +483,28 @@ export default function WekeleaApp() {
     } catch (e: any) {
       alert(e.message);
     }
+  };
+
+  // Refresh the signed-in user (wallet, stats) — used after campaign actions.
+  const refreshCurrentUser = async () => {
+    if (!currentUser) return;
+    try {
+      const fresh = await WekeleaAPI.getUser(currentUser.id);
+      setCurrentUser(fresh);
+      localStorage.setItem('wekelea_user', JSON.stringify(fresh));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Open the M-Pesa deposit prompt (shared with the wallet bar).
+  const openDepositPrompt = () => {
+    if (!currentUser) return;
+    setMpesaPhone(currentUser.phone);
+    setMpesaAmount(1000);
+    setPendingCheckoutId(null);
+    setMpesaError(null);
+    setShowMpesaPrompt(true);
   };
 
   const handleApproveSettle = async (contractId: string) => {
@@ -1170,7 +1193,26 @@ export default function WekeleaApp() {
       {/* --- SCREEN 3: APP MAIN DASHBOARD --- */}
       {currentView === 'dashboard' && currentUser && (
         <div className="flex flex-col space-y-6">
-          
+
+          {/* Mode selector: One-to-One vs One-to-Many */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="glass p-4 rounded-2xl border-2 border-[#EC7505]/60 flex flex-col space-y-1.5 relative">
+              <span className="absolute top-2.5 right-2.5 text-[8px] font-black uppercase tracking-wider bg-[#EC7505] text-black px-1.5 py-0.5 rounded">Here</span>
+              <span className="text-xl">🤝</span>
+              <h3 className="font-black text-xs text-white">One-to-One</h3>
+              <p className="text-[10px] text-gray-400 leading-tight">Two parties, one agreement. Both fund escrow; it releases when conditions are verified.</p>
+            </div>
+            <button
+              id="mode-campaigns-btn"
+              onClick={() => { setSelectedContract(null); setCurrentView('campaigns'); }}
+              className="glass glass-interactive p-4 rounded-2xl border border-white/10 hover:border-[#EC7505]/40 flex flex-col space-y-1.5 text-left transition active:scale-[0.98]"
+            >
+              <span className="text-xl">📣</span>
+              <h3 className="font-black text-xs text-white">One-to-Many</h3>
+              <p className="text-[10px] text-gray-400 leading-tight">Sponsor a brief; creators earn per 1,000 verified views, paid from escrow.</p>
+            </button>
+          </div>
+
           {/* Quick Create Agreement CTA */}
           <div className="flex justify-between items-center pt-2">
             <h2 className="text-lg font-black text-white flex items-center space-x-2">
@@ -1726,6 +1768,16 @@ export default function WekeleaApp() {
           )}
 
         </div>
+      )}
+
+      {/* --- ONE-TO-MANY: CREATOR CAMPAIGNS --- */}
+      {currentView === 'campaigns' && currentUser && (
+        <CampaignHub
+          currentUser={currentUser}
+          onBack={() => setCurrentView('dashboard')}
+          onDataChanged={refreshCurrentUser}
+          onDeposit={openDepositPrompt}
+        />
       )}
 
       {/* --- SCREEN 4: CREATE CONTRACT FORM --- */}
