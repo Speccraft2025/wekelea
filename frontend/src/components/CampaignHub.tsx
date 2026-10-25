@@ -24,7 +24,8 @@ const CATEGORIES: AgreementCategory[] = [
 const platformEmoji = (p: string) => PLATFORMS.find((x) => x.key === p)?.emoji ?? '🌐';
 const kes = (n: number) => 'KES ' + Number(n || 0).toLocaleString();
 const grossPayout = (views: number, rate: number) => Math.round((rate * views) / 1000 * 100) / 100;
-const netAfterFee = (gross: number) => Math.round(gross * 0.95 * 100) / 100;
+const CAMPAIGN_FEE_RATE = 0.10;
+const creatorPool = (budget: number) => Math.round(budget * (1 - CAMPAIGN_FEE_RATE) * 100) / 100;
 
 interface Props {
   currentUser: User;
@@ -122,7 +123,7 @@ export default function CampaignHub({ currentUser, onBack, onDataChanged, onDepo
             <span>📣</span>
             <span>Creator Campaigns</span>
           </h2>
-          <p className="text-[11px] text-gray-500">Sponsor briefs. Creators earn per 1,000 verified views — paid from escrow.</p>
+      <p className="text-[11px] text-gray-500">Brief once. Select creators. Pay only from funded escrow.</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
@@ -216,13 +217,14 @@ function EmptyState({ emoji, text }: { emoji: string; text: string }) {
 }
 
 function BudgetBar({ c }: { c: Campaign }) {
-  const spent = c.budget - c.budgetRemaining;
-  const pct = c.budget > 0 ? Math.min(100, Math.round((spent / c.budget) * 100)) : 0;
+  const pool = creatorPool(c.budget);
+  const spent = Math.max(0, pool - c.budgetRemaining);
+  const pct = pool > 0 ? Math.min(100, Math.round((spent / pool) * 100)) : 0;
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-[10px] text-gray-400">
         <span>{kes(spent)} released</span>
-        <span>{kes(c.budgetRemaining)} left</span>
+        <span>{kes(c.budgetRemaining)} creator pool left</span>
       </div>
       <div className="h-2 rounded-full bg-white/10 overflow-hidden">
         <div className="h-full bg-[#EC7505]" style={{ width: `${pct}%` }} />
@@ -233,6 +235,8 @@ function BudgetBar({ c }: { c: Campaign }) {
 
 function StatusPill({ status }: { status: string }) {
   const map: Record<string, string> = {
+    APPLIED: 'bg-sky-500/15 text-sky-300 border-sky-500/30',
+    SELECTED: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
     AWAITING_FUNDING: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
     ACTIVE: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
     CLOSED: 'bg-white/10 text-gray-400 border-white/10',
@@ -241,6 +245,7 @@ function StatusPill({ status }: { status: string }) {
     REJECTED: 'bg-rose-500/15 text-rose-300 border-rose-500/30',
   };
   const label: Record<string, string> = {
+    APPLIED: 'Applied', SELECTED: 'Selected — create',
     AWAITING_FUNDING: 'Awaiting funding', ACTIVE: 'Live', CLOSED: 'Closed',
     SUBMITTED: 'Under review', APPROVED: 'Paid', REJECTED: 'Not approved',
   };
@@ -316,6 +321,7 @@ function CampaignDetail({
   const isAdmin = currentUser.id === 'admin';
   const canReview = isSponsor || isAdmin;
   const myExisting = submissions.filter((s) => s.creatorId === currentUser.id);
+  const myApplication = myExisting[0];
 
   const run = async (fn: () => Promise<any>, successMsg: string) => {
     setBusy(true); setError(null);
@@ -385,7 +391,7 @@ function CampaignDetail({
       {isSponsor && campaign.status === 'AWAITING_FUNDING' && (
         <div className="glass p-4 rounded-2xl border-white/5 space-y-3">
           <p className="text-xs text-gray-300">
-            Lock <strong className="text-white">{kes(campaign.budget)}</strong> into escrow to publish this campaign. Creators are paid from this budget as views are verified.
+            Lock <strong className="text-white">{kes(campaign.budget)}</strong> to publish: <strong className="text-white">{kes(creatorPool(campaign.budget))}</strong> becomes the creator pool and <strong className="text-white">{kes(campaign.budget - creatorPool(campaign.budget))}</strong> is haddy&apos;s 10% campaign fee.
           </p>
           {currentUser.walletBalance < campaign.budget ? (
             <button onClick={onDeposit} className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold py-3 rounded-xl text-xs flex items-center justify-center space-x-1.5">
@@ -401,16 +407,20 @@ function CampaignDetail({
         </div>
       )}
       {isSponsor && campaign.status === 'ACTIVE' && (
-        <button disabled={busy} onClick={() => { if (confirm('Close this campaign? Unspent budget is refunded to your wallet.')) run(() => WekeleaAPI.closeCampaign(campaign.id, currentUser.id), 'Campaign closed. Unspent budget refunded.'); }}
+        <button disabled={busy} onClick={() => { if (confirm('Close this campaign? Unspent creator funds are refunded to your wallet.')) run(() => WekeleaAPI.closeCampaign(campaign.id, currentUser.id), 'Campaign closed. Unspent creator funds refunded.'); }}
           className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-bold py-2.5 rounded-xl text-xs">
           Close campaign & refund {kes(campaign.budgetRemaining)}
         </button>
       )}
 
-      {/* Creator: submit */}
-      {!isSponsor && campaign.status === 'ACTIVE' && (
+      {/* Creator flow: apply first, then publish only after selection */}
+      {!isSponsor && campaign.status === 'ACTIVE' && !myApplication && (
+        <ApplyForm busy={busy} onApply={(note) =>
+          run(() => WekeleaAPI.applyToCampaign(campaign.id, currentUser.id, note), 'Application sent — wait for selection before you create.')}/>
+      )}
+      {!isSponsor && campaign.status === 'ACTIVE' && myApplication?.status === 'SELECTED' && (
         <SubmitForm campaign={campaign} busy={busy} onSubmit={(payload) =>
-          run(() => WekeleaAPI.submitToCampaign(campaign.id, { userId: currentUser.id, ...payload }), 'Submission sent — the sponsor will verify your views.')} />
+          run(() => WekeleaAPI.submitToCampaign(campaign.id, { userId: currentUser.id, ...payload }), 'Post received — we will verify the result and release payout.')}/>
       )}
 
       {/* My submissions on this campaign (creator view) */}
@@ -432,6 +442,7 @@ function CampaignDetail({
           ) : submissions.map((s) => (
             <ReviewRow key={s.id} s={s} canReview={canReview && campaign.status === 'ACTIVE'} rate={campaign.ratePer1000}
               budgetRemaining={campaign.budgetRemaining} busy={busy}
+              onSelect={() => run(() => WekeleaAPI.selectApplicant(s.id, currentUser.id), 'Creator selected — they can now submit their post.')}
               onApprove={(views, notes) => run(() => WekeleaAPI.approveSubmission(s.id, currentUser.id, views, notes), 'Payout released to the creator.')}
               onReject={(notes) => run(() => WekeleaAPI.rejectSubmission(s.id, currentUser.id, notes), 'Submission rejected.')} />
           ))}
@@ -439,6 +450,18 @@ function CampaignDetail({
       )}
     </div>
   );
+}
+
+function ApplyForm({ busy, onApply }: { busy: boolean; onApply: (note: string) => void }) {
+  const [note, setNote] = useState('');
+  return <form onSubmit={(e) => { e.preventDefault(); onApply(note); }} className="glass p-4 rounded-2xl border-white/5 space-y-3">
+    <div>
+      <p className="text-xs font-bold text-white">Apply to this campaign</p>
+      <p className="text-[10px] text-gray-400 mt-1">The artist selects creators before any work begins. Do not publish until selected.</p>
+    </div>
+    <textarea value={note} onChange={(e) => setNote(e.target.value)} required rows={3} placeholder="Why are you a strong fit? Include your audience and content idea." className="input-field text-xs resize-none" />
+    <button type="submit" disabled={busy || !note.trim()} className="w-full bg-[#EC7505] hover:bg-[#D84A05] disabled:opacity-50 text-black font-black py-3 rounded-xl text-xs">Apply to campaign</button>
+  </form>;
 }
 
 function SubmitForm({ campaign, busy, onSubmit }: {
@@ -451,7 +474,7 @@ function SubmitForm({ campaign, busy, onSubmit }: {
   const [note, setNote] = useState('');
   const views = Math.max(0, Number(claimedViews) || 0);
   const estGross = grossPayout(views, campaign.ratePer1000);
-  const estNet = netAfterFee(Math.min(estGross, campaign.budgetRemaining));
+  const estPayout = Math.min(estGross, campaign.budgetRemaining);
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); onSubmit({ postUrl, proofLink, claimedViews: views, note }); }}
@@ -475,8 +498,8 @@ function SubmitForm({ campaign, busy, onSubmit }: {
       </div>
       {views > 0 && (
         <p className="text-[11px] text-gray-400 bg-black/20 rounded-lg p-2.5 border border-white/5">
-          Estimated payout at {views.toLocaleString()} verified views: <strong className="text-emerald-400">{kes(estNet)}</strong>
-          <span className="block text-[9px] text-gray-500 mt-0.5">Final amount is based on the sponsor-verified count, less the 5% service fee, and is capped at the remaining budget.</span>
+          Estimated payout at {views.toLocaleString()} verified views: <strong className="text-emerald-400">{kes(estPayout)}</strong>
+          <span className="block text-[9px] text-gray-500 mt-0.5">Creators receive the advertised rate in full. Final payment uses the verified count and cannot exceed the creator pool left.</span>
         </p>
       )}
       <button type="submit" disabled={busy || !postUrl} className="w-full bg-[#EC7505] hover:bg-[#D84A05] disabled:opacity-50 text-black font-black py-3 rounded-xl text-xs active:scale-95">
@@ -486,26 +509,29 @@ function SubmitForm({ campaign, busy, onSubmit }: {
   );
 }
 
-function ReviewRow({ s, canReview, rate, budgetRemaining = 0, busy, onApprove, onReject }: {
+function ReviewRow({ s, canReview, rate, budgetRemaining = 0, busy, onApprove, onReject, onSelect }: {
   s: CampaignSubmission; canReview: boolean; rate: number; budgetRemaining?: number; busy: boolean;
   onApprove: (views: number, notes: string) => void; onReject: (notes: string) => void;
+  onSelect?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [views, setViews] = useState(String(s.claimedViews || 0));
   const [notes, setNotes] = useState('');
   const v = Math.max(0, Number(views) || 0);
-  const estNet = netAfterFee(Math.min(grossPayout(v, rate), budgetRemaining));
+  const estPayout = Math.min(grossPayout(v, rate), budgetRemaining);
 
   return (
     <div className="glass p-4 rounded-2xl border-white/5 space-y-2">
       <div className="flex justify-between items-start">
         <div className="min-w-0 space-y-0.5">
-          <a href={s.postUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
+          {s.postUrl ? <a href={s.postUrl} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
             className="text-xs font-bold text-[#EC7505] hover:underline flex items-center space-x-1 truncate">
             <ExternalLink size={11} className="flex-shrink-0" /><span className="truncate">{s.postUrl}</span>
-          </a>
+          </a> : <p className="text-xs font-bold text-white">Creator application</p>}
           <p className="text-[10px] text-gray-500">
-            {s.status === 'APPROVED'
+            {s.status === 'APPLIED' ? 'Awaiting artist selection'
+              : s.status === 'SELECTED' ? 'Selected — awaiting published post'
+              : s.status === 'APPROVED'
               ? `${s.verifiedViews.toLocaleString()} verified · paid ${kes(s.payoutAmount)}`
               : `${s.claimedViews.toLocaleString()} claimed views`}
           </p>
@@ -518,6 +544,9 @@ function ReviewRow({ s, canReview, rate, budgetRemaining = 0, busy, onApprove, o
         <StatusPill status={s.status} />
       </div>
 
+      {canReview && s.status === 'APPLIED' && (
+        <button disabled={busy} onClick={onSelect} className="w-full mt-1 bg-[#EC7505] hover:bg-[#D84A05] disabled:opacity-50 text-black font-black py-2.5 rounded-xl text-xs">Select creator</button>
+      )}
       {canReview && s.status === 'SUBMITTED' && (
         <div className="pt-1">
           {!open ? (
@@ -527,7 +556,7 @@ function ReviewRow({ s, canReview, rate, budgetRemaining = 0, busy, onApprove, o
               <label className="text-[10px] font-semibold text-gray-400 block">Verified view count</label>
               <input value={views} onChange={(e) => setViews(e.target.value)} type="number" min={0} className="input-field text-xs" />
               <p className="text-[11px] text-gray-400">
-                Creator receives <strong className="text-emerald-400">{kes(estNet)}</strong> (after 5% fee).
+                Creator receives <strong className="text-emerald-400">{kes(estPayout)}</strong>.
                 {grossPayout(v, rate) > budgetRemaining && <span className="text-amber-400 block text-[9px]">Capped at the remaining escrow budget ({kes(budgetRemaining)}).</span>}
               </p>
               <input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Review notes (optional)" className="input-field text-xs" />
@@ -561,9 +590,10 @@ function CreateCampaign({ currentUser, onClose, onCreated }: {
   const [platform, setPlatform] = useState<CampaignPlatform>('TikTok');
   const [category, setCategory] = useState<AgreementCategory>('Creative Work');
   const [requirements, setRequirements] = useState<string[]>(['']);
-  const [rate, setRate] = useState('500');
-  const [budget, setBudget] = useState('10000');
+  const [rate, setRate] = useState('260');
+  const [budget, setBudget] = useState('5000');
   const [minViews, setMinViews] = useState('1000');
+  const [deadline, setDeadline] = useState('');
   const [trustedSource, setTrustedSource] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -580,6 +610,7 @@ function CreateCampaign({ currentUser, onClose, onCreated }: {
         sponsorId: currentUser.id, title, brief, platform, category,
         requirements: requirements.map((r) => r.trim()).filter(Boolean),
         ratePer1000: Number(rate), budget: Number(budget), minViews: Number(minViews),
+        deadline: deadline ? new Date(`${deadline}T23:59:59`).toISOString() : undefined,
         trustedSource: trustedSource.trim() || undefined,
       });
       onCreated(c);
@@ -607,7 +638,7 @@ function CreateCampaign({ currentUser, onClose, onCreated }: {
           </div>
           <div>
             <label className="text-[10px] font-semibold text-gray-400 block mb-1">Brief *</label>
-            <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3} placeholder="What should creators make? Include tags, mentions and must-haves." className="input-field text-xs resize-none" />
+            <textarea value={brief} onChange={(e) => setBrief(e.target.value)} required rows={3} placeholder="What should creators make? Include the sound, hook, tags, mentions and must-haves." className="input-field text-xs resize-none" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -642,6 +673,11 @@ function CreateCampaign({ currentUser, onClose, onCreated }: {
           </div>
 
           <div>
+            <label className="text-[10px] font-semibold text-gray-400 block mb-1">Application deadline *</label>
+            <input value={deadline} onChange={(e) => setDeadline(e.target.value)} type="date" required className="input-field text-xs" />
+          </div>
+
+          <div>
             <label className="text-[10px] font-semibold text-gray-400 block mb-1">Deliverable requirements *</label>
             <div className="space-y-2">
               {requirements.map((r, i) => (
@@ -661,9 +697,12 @@ function CreateCampaign({ currentUser, onClose, onCreated }: {
             <input value={trustedSource} onChange={(e) => setTrustedSource(e.target.value)} placeholder="e.g. TikTok analytics screenshot" className="input-field text-xs" />
           </div>
 
-          <div className="bg-black/20 rounded-xl p-3 border border-white/5 text-[11px] text-gray-400 flex items-start space-x-2">
+          <div className="bg-black/20 rounded-xl p-3 border border-white/5 text-[11px] text-gray-400 space-y-2">
+            <div className="flex items-start space-x-2">
             <Globe size={13} className="text-[#EC7505] mt-0.5 flex-shrink-0" />
-            <span>After creating, you&apos;ll lock <strong className="text-white">{kes(Number(budget) || 0)}</strong> into escrow. Creators are paid from this budget only when you verify their views.</span>
+            <span>After creating, you&apos;ll lock <strong className="text-white">{kes(Number(budget) || 0)}</strong>. Applications are free; only selected creators can submit work.</span>
+            </div>
+            <p className="pl-5 text-[10px] text-gray-500"><strong className="text-gray-300">{kes(creatorPool(Number(budget) || 0))}</strong> is the creator pool; <strong className="text-gray-300">{kes((Number(budget) || 0) - creatorPool(Number(budget) || 0))}</strong> is haddy&apos;s 10% campaign fee. At {kes(Number(rate) || 0)} per 1,000 verified views, creators can earn up to <strong className="text-gray-300">{Math.floor(creatorPool(Number(budget) || 0) / Math.max(1, Number(rate) || 1)).toLocaleString()} full 1k-view tiers</strong>.</p>
           </div>
 
           <button type="submit" disabled={busy} className="w-full bg-[#EC7505] hover:bg-[#D84A05] disabled:opacity-50 text-black font-black py-3 rounded-xl text-xs uppercase tracking-wider active:scale-95">

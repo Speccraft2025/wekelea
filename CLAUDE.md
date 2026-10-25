@@ -1,13 +1,15 @@
-# CLAUDE.md — Wekelea Escrow Platform: Full Implementation Handoff
+# CLAUDE.md — haddy Escrow Platform: Full Implementation Handoff
 
 > This file is picked up automatically by Claude Code when you run `claude` inside this project directory.
 > It is the single source of truth for architecture, current state, and implementation tasks.
 
 ---
 
-## What Is Wekelea?
+## What Is haddy?
 
-**Wekelea** (Swahili: *"to bet/stake"*) is a **peer-to-peer social escrow contract platform** built for the Kenyan market. Users make real social agreements (sports predictions, debates, challenges), both parties lock KES stakes into a secure escrow vault via M-Pesa STK Push, and funds auto-release to the winner upon mutual settlement or admin arbitration.
+**haddy** (pronounced **HAH-dee**) is a **peer-to-peer social escrow contract platform** built for the Kenyan market. The name is inspired by *ahadi* — a promise. Users make real social agreements (sports predictions, debates, challenges), both parties lock KES stakes into a secure escrow vault via M-Pesa STK Push, and funds auto-release to the winner upon mutual settlement or admin arbitration.
+
+**Brand migration boundary:** Customer-facing copy and assets use **haddy** and the primary tagline is “Put your money where your mouth is.” Keep legacy `wekelea` infrastructure identifiers (repository slug, package names, local-storage key, channels, RPCs, database names and credentials) unchanged until a dependency and availability review is complete. The old W-shaped mark is retired; use `frontend/public/assets/haddy-mark.svg`, an abstract lowercase `h`/promise mark, for new UI work. Brand and domain availability are unverified.
 
 **Legal Position**: NOT a sportsbook, gambling platform, or betting house. No odds generated. No house bets. Dual-consent P2P escrow only.
 
@@ -265,7 +267,7 @@ Fully simulated — no real JWT validation:
 - [x] End-to-end smoke test via API: happy path (create→accept→fund→claim→settle) and dispute path (dispute→admin resolve) both verified; wallet math and 5% fee correct
 
 ### P1 - Core Feature Completion (DONE — 2026-07-13)
-- [x] QR Code in Share Modal: `qrcode.react@^4.2.0` installed; `QRCodeSVG` renders a real scannable QR of the invite URL with the Wekelea logo excavated in the center (verified in browser)
+- [x] QR Code in Share Modal: `qrcode.react@^4.2.0` installed; `QRCodeSVG` renders a real scannable QR of the invite URL with the haddy mark excavated in the center (verified in browser)
 - [x] WhatsApp share button: already implemented — opens `https://wa.me/?text=...` with the invite link
 - [x] Contract URL deep-linking: `?contractId=` captured on mount; opens the contract once authenticated (prompts login first if logged out), then strips the query param. Verified both logged-out→login→open and logged-in→open paths
 - [x] Admin panel dynamic winners: done in P0 — buttons resolve to the real contract creator/counterparty with their usernames
@@ -280,7 +282,7 @@ Fully simulated — no real JWT validation:
 - [ ] Replace alert() calls with toast/snackbar system (e.g. react-hot-toast)
 - [ ] Empty states for empty contract lists
 - [ ] Transaction history pagination
-- [ ] PWA manifest: ensure public/manifest.json exists with Wekelea branding
+- [ ] PWA manifest: ensure public/manifest.json exists with haddy branding
 
 ### P3 - Architecture & Refactor
 - [ ] Split page.tsx (1920 lines) into separate component files:
@@ -351,9 +353,10 @@ Fully simulated — no real JWT validation:
 ## Brand Assets
 
 Located in frontend/public/assets/:
-- logo.png — Main logo (104 KB)
+- haddy-mark.svg — Current haddy promise mark (use for new UI work)
+- logo.png — Legacy Wekelea logo (retained only for backwards compatibility; do not use in new UI work)
 - favicon.ico — Browser favicon (4 KB)
-- wekelea 3d logo.glb — 3D GLB model for Three.js splash screen
+- The old W-shaped/3D logo direction is retired; the splash screen uses the haddy SVG mark
 
 Brand colors:
 - Primary Orange: #EC7505

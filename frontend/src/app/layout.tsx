@@ -2,10 +2,10 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Wekelea — Programmable Escrow for Agreements',
-  description: 'Wekelea securely holds funds in escrow and releases them only when agreed conditions are met. Conditional payments for freelance work, personal goals, business deals and more — funded by M-Pesa.',
+  title: 'haddy — Put your money where your mouth is.',
+  description: 'haddy securely holds funds in escrow and releases them only when agreed conditions are met. Conditional payments for freelance work, personal goals, business deals and more — funded by M-Pesa.',
   keywords: 'escrow, peer-to-peer, agreements, conditional payments, M-Pesa, Kenya, freelance, milestones, secure payments',
-  authors: [{ name: 'Wekelea Team' }],
+  authors: [{ name: 'haddy Team' }],
 };
 
 export const viewport: Viewport = {
@@ -27,7 +27,7 @@ export default function RootLayout({
         {/* PWA Tags */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <link rel="icon" href="/favicon.ico" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
       </head>
       <body>
         <div className="w-full min-h-screen flex flex-col relative overflow-x-hidden">

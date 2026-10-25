@@ -20,14 +20,18 @@ export async function POST(req: NextRequest) {
       budget, deadline, trustedSource, privacy, sponsorId,
     } = body;
 
-    if (!title || !platform || !sponsorId) {
+    if (!title || !brief || !platform || !sponsorId) {
       return badRequest('Missing required campaign fields');
     }
     const rate = Number(ratePer1000);
     if (isNaN(rate) || rate <= 0) return badRequest('Rate per 1,000 views must be greater than zero');
     const total = Number(budget);
     if (isNaN(total) || total <= 0) return badRequest('Budget must be greater than zero');
-    if (total < rate) return badRequest('Budget must be at least one payout tier (rate per 1,000 views)');
+    if (total * 0.9 < rate) return badRequest('After the 10% haddy campaign fee, the creator pool must cover at least one payout tier');
+    const closingAt = new Date(deadline);
+    if (!deadline || Number.isNaN(closingAt.getTime()) || closingAt <= new Date()) {
+      return badRequest('Choose a future application deadline');
+    }
 
     let reqs: string[] = [];
     if (Array.isArray(requirements)) reqs = requirements.filter((t: string) => String(t).trim() !== '');
@@ -46,7 +50,7 @@ export async function POST(req: NextRequest) {
       budget: total,
       budgetRemaining: 0,
       status: 'AWAITING_FUNDING',
-      deadline: deadline || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      deadline: closingAt.toISOString(),
       trustedSource: trustedSource?.trim() || undefined,
       privacy: (privacy || 'Public') as PrivacySetting,
       createdAt: new Date().toISOString(),

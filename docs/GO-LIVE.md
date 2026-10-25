@@ -1,6 +1,6 @@
-# Wekelea — Go-Live Guide (Serverless + Supabase + Daraja + Netlify)
+# haddy — Go-Live Guide (Serverless + Supabase + Daraja + Netlify)
 
-This guide covers everything needed to take Wekelea from local prototype to a live,
+This guide covers everything needed to take haddy from local prototype to a live,
 production-backed deployment. The architecture after the serverless refactor:
 
 ```
@@ -28,7 +28,7 @@ replaced by Next.js API routes and Supabase Realtime.
 ## Part A — Create the Supabase project (~5 min)
 
 1. Go to https://supabase.com → sign in (GitHub login is easiest) → **New project**.
-2. Name it `wekelea`, pick a strong database password (save it), choose the region
+2. Use your chosen Supabase project name, pick a strong database password (save it), and choose the region
    closest to Kenya (e.g. **eu-west** / Frankfurt or London).
 3. Wait for the project to finish provisioning (~2 min).
 4. In the project, open **Project Settings → API** and copy these three values:
@@ -52,7 +52,7 @@ replaced by Next.js API routes and Supabase Realtime.
 
 1. Go to https://developer.safaricom.co.ke → **Log in / Sign up**.
 2. Once in the portal, click **My Apps → Add a new app**.
-   - Name: `wekelea-sandbox`
+   - Name: `haddy-sandbox` (availability unverified)
    - Tick the **Lipa Na M-Pesa Sandbox** product (and M-Pesa Sandbox).
    - Create.
 3. Open the app → copy the **Consumer Key** and **Consumer Secret**.
@@ -76,6 +76,8 @@ replaced by Next.js API routes and Supabase Realtime.
 
 The repo is already on GitHub at `github.com/Speccraft2025/wekelea` and `gh` is
 authenticated. As the refactor lands I'll commit and push to `master`.
+
+> The public product brand is **haddy** (HAH-dee), inspired by *ahadi* — a promise. The repository slug and existing infrastructure identifiers remain `wekelea` until their dependencies and availability are reviewed; do not rename them as part of a brand-only release.
 
 ---
 

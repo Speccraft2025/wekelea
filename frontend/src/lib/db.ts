@@ -348,6 +348,12 @@ export const submitToCampaign = (
   p_proof_link: proofLink, p_claimed_views: claimedViews, p_note: note,
 }, rowToSubmission);
 
+export const applyToCampaign = (campaignId: string, creatorId: string, note: string) =>
+  rpcOne('apply_to_campaign', { p_campaign_id: campaignId, p_creator_id: creatorId, p_note: note }, rowToSubmission);
+
+export const selectApplicant = (submissionId: string, reviewerId: string) =>
+  rpcOne('select_campaign_applicant', { p_submission_id: submissionId, p_reviewer_id: reviewerId }, rowToSubmission);
+
 export const approveSubmission = (submissionId: string, reviewerId: string, verifiedViews: number, notes: string) =>
   rpcOne('approve_submission', {
     p_submission_id: submissionId, p_reviewer_id: reviewerId, p_verified_views: verifiedViews, p_notes: notes,

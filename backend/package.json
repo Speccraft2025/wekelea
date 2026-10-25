@@ -1,7 +1,7 @@
 {
   "name": "wekelea-backend",
   "version": "1.0.0",
-  "description": "Backend API and escrow processor for Wekelea",
+  "description": "Backend API and escrow processor for haddy",
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon src/index.ts",

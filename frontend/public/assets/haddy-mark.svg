@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title>haddy promise mark</title>
+  <defs>
+    <linearGradient id="haddyGradient" x1="40" y1="30" x2="216" y2="226" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F2A33B"/>
+      <stop offset="1" stop-color="#EC7505"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="64" fill="#141417"/>
+  <path d="M78 184V72c0-18 14-32 32-32s32 14 32 32v112" fill="none" stroke="url(#haddyGradient)" stroke-linecap="round" stroke-width="24"/>
+  <path d="M142 136c0-18 14-32 32-32s32 14 32 32v48" fill="none" stroke="url(#haddyGradient)" stroke-linecap="round" stroke-width="24"/>
+  <path d="M78 136h64" fill="none" stroke="#F7D38C" stroke-linecap="round" stroke-width="18"/>
+  <circle cx="174" cy="72" r="10" fill="#F7D38C"/>
+</svg>

@@ -1,5 +1,5 @@
 // Domain types (camelCase) returned by the API — mirror the frontend interfaces.
-// Wekelea is escrow infrastructure for agreements. No gambling vocabulary.
+// haddy is escrow infrastructure for agreements. No gambling vocabulary.
 
 export type ContractStatus =
   | 'DRAFT' | 'AWAITING_ACCEPTANCE' | 'AWAITING_FUNDING' | 'ACTIVE'
@@ -78,7 +78,7 @@ export interface Notification {
 // --- One-to-Many: Campaigns (creator economy) -------------------------------
 
 export type CampaignStatus = 'AWAITING_FUNDING' | 'ACTIVE' | 'CLOSED';
-export type SubmissionStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+export type SubmissionStatus = 'APPLIED' | 'SELECTED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 export type CampaignPlatform = 'TikTok' | 'Instagram' | 'YouTube' | 'X' | 'Other';
 
 export interface Campaign {

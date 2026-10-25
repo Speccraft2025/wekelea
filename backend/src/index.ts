@@ -26,7 +26,7 @@ app.use('/api', apiRouter);
 
 // Basic health check
 app.get('/', (req, res) => {
-  res.json({ status: 'OK', service: 'Wekelea Escrow Engine', version: '1.0.0' });
+  res.json({ status: 'OK', service: 'haddy Escrow Engine', version: '1.0.0' });
 });
 
 // Configure Socket.io
@@ -85,7 +85,7 @@ app.use((req, res, next) => {
 const PORT = process.env.PORT || 5001;
 
 httpServer.listen(PORT, () => {
-  console.log(`🚀 Wekelea Escrow Engine running on http://localhost:${PORT}`);
+  console.log(`🚀 haddy Escrow Engine running on http://localhost:${PORT}`);
   
   // Seed the DB file immediately on startup
   Database.getUsers().then(() => {

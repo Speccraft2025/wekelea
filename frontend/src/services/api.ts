@@ -92,7 +92,7 @@ export interface Notification {
 // --- One-to-Many: Campaigns (creator economy) -------------------------------
 
 export type CampaignStatus = 'AWAITING_FUNDING' | 'ACTIVE' | 'CLOSED';
-export type SubmissionStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+export type SubmissionStatus = 'APPLIED' | 'SELECTED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 export type CampaignPlatform = 'TikTok' | 'Instagram' | 'YouTube' | 'X' | 'Other';
 
 export interface Campaign {
@@ -337,6 +337,18 @@ export class WekeleaAPI {
     return this.request<CampaignSubmission>(`/campaigns/${campaignId}/submit`, {
       method: 'POST',
       body: JSON.stringify(payload),
+    });
+  }
+
+  static async applyToCampaign(campaignId: string, userId: string, note: string): Promise<CampaignSubmission> {
+    return this.request<CampaignSubmission>(`/campaigns/${campaignId}/apply`, {
+      method: 'POST', body: JSON.stringify({ userId, note }),
+    });
+  }
+
+  static async selectApplicant(submissionId: string, userId: string): Promise<CampaignSubmission> {
+    return this.request<CampaignSubmission>(`/campaigns/submissions/${submissionId}/select`, {
+      method: 'POST', body: JSON.stringify({ userId }),
     });
   }
 

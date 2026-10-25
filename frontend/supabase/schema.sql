@@ -1,8 +1,8 @@
 -- ============================================================================
--- Wekelea — Programmable escrow for human agreements — Supabase schema
+-- haddy — Programmable escrow for human agreements — Supabase schema
 -- Run this whole file once in the Supabase SQL Editor.
 --
--- Wekelea securely holds funds in escrow and releases them only when agreed
+-- haddy securely holds funds in escrow and releases them only when agreed
 -- conditions are verified. This is NOT a betting product — there is no gambling
 -- vocabulary anywhere in this schema.
 --
@@ -206,7 +206,7 @@ begin
       insert into notifications (id, user_id, title, message, contract_id, type, read)
       values (gen_id('n_'), pid, 'Escrow Funded & Active 🔒',
               'Both parties have funded "' || c.title || '". KES ' || c.total_escrow ||
-              ' is now secured in Wekelea escrow. Funds release when conditions are verified.', p_contract_id, 'CONTRACT_ACTIVE', false);
+              ' is now secured in haddy escrow. Funds release when conditions are verified.', p_contract_id, 'CONTRACT_ACTIVE', false);
     end loop;
     insert into audit_logs (id, contract_id, action, details)
     values (gen_id('log_'), p_contract_id, 'AGREEMENT_ACTIVE', 'Escrow active with total held KES ' || c.total_escrow);
@@ -273,7 +273,7 @@ begin
           'Escrow released for completed agreement "' || c.title || '" (service fee deducted)');
   insert into transactions (id, user_id, amount, type, status, reference, description)
   values (gen_id('tx_'), 'admin', fee, 'FEE', 'SUCCESS',
-          'FEE_' || substr(c.id,3), 'Wekelea 5% service fee for agreement "' || c.title || '"');
+          'FEE_' || substr(c.id,3), 'haddy 5% service fee for agreement "' || c.title || '"');
   update users set wallet_balance = wallet_balance + fee where id = 'admin';
 
   update contracts set status = 'SETTLED', updated_at = now() where id = p_contract_id returning * into c;
@@ -285,7 +285,7 @@ begin
   insert into notifications (id, user_id, title, message, contract_id, type, read)
   values (gen_id('n_'), p_approver_id, 'Agreement Completed 🤝',
           'You approved release for "' || c.title || '". Escrow was released to ' ||
-          recipient.username || '. Thanks for using Wekelea!', c.id, 'SETTLEMENT_APPROVED', false);
+          recipient.username || '. Thanks for using haddy!', c.id, 'SETTLEMENT_APPROVED', false);
   insert into audit_logs (id, contract_id, action, details)
   values (gen_id('log_'), c.id, 'ESCROW_RELEASED',
           'Escrow KES ' || c.total_escrow || ' released. Recipient: ' || recipient.username ||
@@ -360,7 +360,7 @@ begin
           'Admin released escrow in your favor for "' || c.title || '"');
   insert into transactions (id, user_id, amount, type, status, reference, description)
   values (gen_id('tx_'), 'admin', fee, 'FEE', 'SUCCESS',
-          'ADMIN_FEE_' || substr(c.id,3), 'Wekelea admin resolution service fee for agreement "' || c.title || '"');
+          'ADMIN_FEE_' || substr(c.id,3), 'haddy admin resolution service fee for agreement "' || c.title || '"');
   update users set wallet_balance = wallet_balance + fee where id = 'admin';
 
   update contracts set status = 'SETTLED', recipient_id = p_recipient_id, updated_at = now() where id = c.id;

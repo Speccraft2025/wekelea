@@ -1,13 +1,17 @@
-# Wekelea 🔒 Peer-to-Peer Social Escrow Contract Platform
+# haddy 🔒 Peer-to-Peer Social Escrow Contract Platform
 
-> "Put your money where your mouth is." Settle social arguments instantly and securely with conditional escrow contracts funded via M-Pesa STK Push.
+> “Put your money where your mouth is.” Settle social arguments instantly and securely with conditional escrow contracts funded via M-Pesa STK Push.
 
-Wekelea is a fast, mobile-first **peer-to-peer social escrow contract platform** optimized for Kenyan payment habits. 
+haddy (pronounced **HAH-dee**) is a fast, mobile-first **peer-to-peer social escrow contract platform** optimized for Kenyan payment habits. The name is inspired by *ahadi* — a promise.
+
+## Brand and compatibility
+
+The customer-facing brand is styled **haddy**. This repository, deployment and database implementation retain legacy `wekelea` identifiers (including package names, local storage keys, RPC names, channels and credentials) for compatibility. Do not rename those identifiers without a dependency review. Brand and domain availability are not yet verified.
 
 ---
 
 ### ⚠️ Legal Compliance & Position Positioning
-Wekelea is **NOT** a sportsbook, sportsbook helper, gambling platform, casino, odds engine, or house-betting system. 
+haddy is **NOT** a sportsbook, sportsbook helper, gambling platform, casino, odds engine, or house-betting system.
 - The platform **does NOT** generate odds.
 - The platform **does NOT** act as a betting counterparty or house.
 - The platform **does NOT** determine event outcomes or winners automatically.
@@ -75,14 +79,14 @@ Start both the Express API (Port 5001) and Next.js PWA client (Port 3000) concur
 npm run dev
 ```
 
-### Step 3: Open Wekelea PWA
+### Step 3: Open haddy PWA
 Open your browser and navigate to:
 **[http://localhost:3000](http://localhost:3000)**
 
 ---
 
 ## 🐳 Running with Docker
-To spin up Wekelea inside Docker containers alongside a clean PostgreSQL database instance:
+To spin up haddy inside Docker containers alongside a clean PostgreSQL database instance:
 
 1. Build and launch all services:
    ```sh
@@ -94,7 +98,7 @@ To spin up Wekelea inside Docker containers alongside a clean PostgreSQL databas
 
 ## 🕹 Step-by-Step Demo Guide (Evaluate immediately)
 
-To assist developers, product managers, and investors evaluating the Wekelea MVP, a **Floating Demo Assist Panel** is displayed on the screen. This allows you to jump perspectives, trigger notifications, and reset states instantly!
+To assist developers, product managers, and investors evaluating the haddy MVP, a **Floating Demo Assist Panel** is displayed on the screen. This allows you to jump perspectives, trigger notifications, and reset states instantly!
 
 ### The Happy Path: Consensual Settlement
 1. **Visit Landing Page**: Review the value proposition, trust rules, and list of public active challenges.
@@ -104,11 +108,11 @@ To assist developers, product managers, and investors evaluating the Wekelea MVP
 5. **Switch Perspectives**: Go to the **Demo Panel** on the right side of the screen and click **Mwende**. The app perspective immediately swaps to **@Mwende_Vibe**'s dashboard!
 6. **Accept Invitation**: Click on the Bell icon in the header or check **Invites & Funding** tab. Mwende sees the active challenge notification. Click the challenge -> read objective terms -> tick terms checkbox -> click **Accept Challenge Terms**. Contract state transitions to `AWAITING_FUNDING`!
 7. **Fund Escrow**: As Mwende, click **Pay Stake via M-Pesa STK**. A Safaricom M-Pesa STK SIM prompt overlay slides up. Click **Confirm PIN**. The processor contacts the simulated webhook callback, deposits KES 2,000, updates Mwende's wallet balance, and updates the contract status!
-8. **Activate Escrow Vault**: Switch back to **Mwangi** via the Demo Panel. Mwangi also clicks **Pay Stake via M-Pesa STK** -> Confirms M-Pesa PIN. Both parties have funded. Wekelea’s Escrow vault activates! The contract status transitions to `🔒 ACTIVE` and is locked securely.
+8. **Activate Escrow Vault**: Switch back to **Mwangi** via the Demo Panel. Mwangi also clicks **Pay Stake via M-Pesa STK** -> Confirms M-Pesa PIN. Both parties have funded. haddy’s escrow vault activates! The contract status transitions to `🔒 ACTIVE` and is locked securely.
 9. **Claim Win**: The event completes. Mwangi clicks **Claim Win & Request Settlement**. Mwende's dashboard immediately gets an alert.
 10. **Settle and Disburse**: Switch to **Mwende**'s dashboard. Mwende clicks the contract details -> clicks **Consent & Settle**. 
     - The escrow releases!
-    - Mwangi's wallet is credited KES 3,800 (KES 4,000 pot minus Wekelea’s 5% transaction fee of KES 200).
+    - Mwangi's wallet is credited KES 3,800 (KES 4,000 pot minus haddy’s 5% transaction fee of KES 200).
     - The treasury account is credited KES 200.
     - Mwangi's streak badge fires!
 

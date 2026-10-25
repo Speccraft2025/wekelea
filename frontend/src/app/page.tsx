@@ -116,7 +116,7 @@ export default function WekeleaApp() {
       try {
         const userObj = JSON.parse(savedUser);
         setCurrentUser(userObj);
-        setCurrentView('dashboard');
+        setCurrentView('campaigns');
       } catch (e) {
         // Clear corrupt storage
         localStorage.removeItem('wekelea_user');
@@ -293,7 +293,7 @@ export default function WekeleaApp() {
       setIsOtpStep(false);
       setLoginPhone('');
       setLoginCode('');
-      setCurrentView('dashboard');
+      setCurrentView('campaigns');
     } catch (err: any) {
       alert(err.message || 'Verification failed');
     }
@@ -315,7 +315,7 @@ export default function WekeleaApp() {
         setCurrentUser(targetUserObj);
         localStorage.setItem('wekelea_user', JSON.stringify(targetUserObj));
         setSelectedContract(null);
-        setCurrentView('dashboard');
+        setCurrentView('campaigns');
       }
     } catch (e) {
       // In case server not running, provide local emulation
@@ -331,7 +331,7 @@ export default function WekeleaApp() {
         setCurrentUser(found);
         localStorage.setItem('wekelea_user', JSON.stringify(found));
         setSelectedContract(null);
-        setCurrentView('dashboard');
+        setCurrentView('campaigns');
       }
     }
   };
@@ -704,7 +704,7 @@ export default function WekeleaApp() {
       )}
 
       {/* FLOATING DEMO CONTROL CENTER (For instant developer pitch evaluation) */}
-      <div className="fixed bottom-4 right-4 z-40 md:top-24 md:right-8 md:bottom-auto">
+      <div className="fixed bottom-4 right-4 z-40 origin-bottom-right scale-[.72] md:top-24 md:right-8 md:bottom-auto md:scale-100">
         <div className="glass p-3 rounded-2xl border-yellow-500/30 flex flex-col space-y-2 shadow-2xl">
           <div className="flex items-center space-x-1.5 border-b border-white/10 pb-1.5">
             <Sliders size={14} className="text-[#D4AF37]" />
@@ -743,17 +743,17 @@ export default function WekeleaApp() {
         <div className="flex flex-col space-y-8 py-6">
           {/* Logo & Headline */}
           <div className="flex flex-col items-center text-center space-y-5 pt-8">
-            <img src="/assets/logo.png" alt="Wekelea Brand Logo" className="w-24 h-24 object-contain drop-shadow-[0_0_20px_rgba(236,117,5,0.45)]" />
-            <div className="flex items-center space-x-3 text-2xl font-black uppercase tracking-wider text-white">
-              <span>Wekelea</span>
+            <img src="/assets/haddy-mark.svg" alt="haddy promise mark" className="w-24 h-24 object-contain drop-shadow-[0_0_20px_rgba(236,117,5,0.45)]" />
+            <div className="flex items-center space-x-3 text-3xl font-black tracking-wide text-white">
+              <span>haddy</span>
             </div>
             <div className="kenya-accent w-32 rounded" />
             <h1 className="text-4xl font-extrabold tracking-tight pt-2 leading-none">
-              Make every agreement <br />
-              <span className="text-[#EC7505] bg-clip-text">enforceable.</span>
+              Put your money where <br />
+              <span className="text-[#EC7505] bg-clip-text">your mouth is.</span>
             </h1>
             <p className="text-gray-400 text-sm max-w-sm">
-              Wekelea securely holds funds in escrow and releases them only when the agreed conditions are met — for freelance work, personal goals, business deals and more. Fast, peer-to-peer, and secure.
+              Artists fund a clear brief once. The right creators apply, get selected, publish, and are paid from escrow after verified results.
             </p>
           </div>
 
@@ -763,7 +763,7 @@ export default function WekeleaApp() {
               id="cta-join-now"
               onClick={() => {
                 if (currentUser) {
-                  setCurrentView('dashboard');
+                  setCurrentView('campaigns');
                 } else {
                   setShowLoginModal(true);
                 }
@@ -771,7 +771,7 @@ export default function WekeleaApp() {
               className="w-full bg-[#EC7505] hover:bg-[#D84A05] text-black font-extrabold py-4 px-6 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2 text-lg active:scale-95"
             >
               <ShieldCheck size={22} />
-              <span>Launch App & Create Agreement</span>
+              <span>Launch a creator campaign</span>
             </button>
 
             <button 
@@ -782,31 +782,31 @@ export default function WekeleaApp() {
               }}
               className="w-full glass hover:bg-white/5 py-4 px-6 rounded-2xl text-gray-300 font-semibold transition text-sm active:scale-95"
             >
-              How Wekelea Escrow Works
+              How campaign escrow works
             </button>
           </div>
 
           {/* Product Principles Grid */}
           <div className="grid grid-cols-2 gap-4 px-2 pt-4">
             <div className="glass p-4 rounded-2xl flex flex-col space-y-2 border-white/5">
-              <span className="text-2xl">🤝</span>
-              <h3 className="font-bold text-sm">P2P Escrow</h3>
-              <p className="text-[11px] text-gray-400 leading-tight">Mutual agreements. Funds stay fully secured inside an independent escrow ledger.</p>
+              <span className="text-2xl">📝</span>
+              <h3 className="font-bold text-sm">One clear brief</h3>
+              <p className="text-[11px] text-gray-400 leading-tight">Every campaign uses the same brief, deadline, rate and verification rules.</p>
             </div>
             <div className="glass p-4 rounded-2xl flex flex-col space-y-2 border-white/5">
               <span className="text-2xl">🟢</span>
-              <h3 className="font-bold text-sm">M-Pesa Native</h3>
-              <p className="text-[11px] text-gray-400 leading-tight">Instant STK push deposits and seamless instant cashouts direct to Kenyan wallets.</p>
+              <h3 className="font-bold text-sm">Funded upfront</h3>
+              <p className="text-[11px] text-gray-400 leading-tight">Artists lock the total budget before creators can apply or start work.</p>
             </div>
             <div className="glass p-4 rounded-2xl flex flex-col space-y-2 border-white/5">
               <span className="text-2xl">🔬</span>
-              <h3 className="font-bold text-sm">100% Verifiable</h3>
-              <p className="text-[11px] text-gray-400 leading-tight">Only objective, verifiable conditions. Clear criteria ensure fair, unambiguous release.</p>
+              <h3 className="font-bold text-sm">Selection first</h3>
+              <p className="text-[11px] text-gray-400 leading-tight">Creators apply. Artists select. Only selected creators can submit a post.</p>
             </div>
             <div className="glass p-4 rounded-2xl flex flex-col space-y-2 border-white/5">
               <span className="text-2xl">⚖️</span>
-              <h3 className="font-bold text-sm">Dispute Safe</h3>
-              <p className="text-[11px] text-gray-400 leading-tight">Neutral arbitration. Escrow freezes and relies on trust logs and evidence if parties disagree.</p>
+              <h3 className="font-bold text-sm">Measured payout</h3>
+              <p className="text-[11px] text-gray-400 leading-tight">Payout is calculated from verified views and can never exceed the remaining escrow.</p>
             </div>
           </div>
 
@@ -815,7 +815,7 @@ export default function WekeleaApp() {
             <div className="flex items-center justify-between">
               <h3 className="font-extrabold text-white text-sm flex items-center space-x-1.5">
                 <Globe size={16} className="text-[#EC7505]" />
-                <span>Live Open Agreements</span>
+                <span>Campaign operations</span>
               </h3>
               <span className="flex items-center space-x-1 text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
                 <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
@@ -823,7 +823,7 @@ export default function WekeleaApp() {
               </span>
             </div>
             <p className="text-[11px] text-gray-500 leading-snug">
-              Open agreements awaiting another party. Sign in to accept one and fund the escrow.
+              The MVP flow is fixed: create a brief, fund it, select creators, review submitted work, then release payout.
             </p>
 
             {(() => {
@@ -835,7 +835,7 @@ export default function WekeleaApp() {
                 return (
                   <div className="bg-black/20 rounded-xl p-6 text-center border border-white/5">
                     <span className="text-2xl block mb-1">🕊️</span>
-                    <p className="text-[11px] text-gray-500">No open public agreements right now. Be the first — launch the app and create one.</p>
+                    <p className="text-[11px] text-gray-500">No public campaign data is shown here. Launch the app to create or browse campaigns.</p>
                   </div>
                 );
               }
@@ -873,10 +873,10 @@ export default function WekeleaApp() {
           <div id="how-it-works-section" className="glass p-5 rounded-2xl border-white/5 space-y-4 mt-8">
             <h3 className="font-extrabold text-white text-lg flex items-center space-x-1.5">
               <span>⚖️</span>
-              <span>Wekelea Trust & Escrow Rules</span>
+              <span>haddy Trust & Escrow Rules</span>
             </h3>
             <p className="text-xs text-gray-400 leading-relaxed">
-              Wekelea is a <strong>peer-to-peer escrow platform for agreements</strong>. We securely hold funds for two consenting parties and release them only when agreed conditions are verified. The platform generates no odds, takes no position, and enforces that agreements reference only objective, verifiable conditions.
+              haddy runs <strong>one-to-many creator campaigns</strong>. The artist locks a budget; creators apply and are selected; approved work is paid from the locked balance after the result is verified.
             </p>
             <div className="grid grid-cols-2 gap-3 text-[10px] pt-2">
               <div className="flex items-start space-x-1 text-emerald-400">
@@ -885,11 +885,11 @@ export default function WekeleaApp() {
               </div>
               <div className="flex items-start space-x-1 text-emerald-400">
                 <Check size={12} className="mt-0.5 flex-shrink-0" />
-                <span>Mutual conditions & dual release approvals</span>
+                <span>Artists select creators before work starts</span>
               </div>
               <div className="flex items-start space-x-1 text-emerald-400">
                 <Check size={12} className="mt-0.5 flex-shrink-0" />
-                <span>Secure manual dispute evidence review</span>
+                <span>Submitted links and proof form the review trail</span>
               </div>
               <div className="flex items-start space-x-1 text-emerald-400">
                 <Check size={12} className="mt-0.5 flex-shrink-0" />
@@ -903,7 +903,7 @@ export default function WekeleaApp() {
 
           {/* Footer */}
           <div className="text-center text-[10px] text-gray-500 py-6 border-t border-white/5">
-            © 2026 Wekelea Escrow Platform. Nairobi, Kenya. All rights reserved.
+            © 2026 haddy Escrow Platform. Nairobi, Kenya. All rights reserved.
           </div>
         </div>
       )}
@@ -923,7 +923,7 @@ export default function WekeleaApp() {
             <div className="text-center space-y-2 mb-6">
               <span className="text-3xl">🔑</span>
               <h2 className="text-2xl font-black text-white">
-                {isOtpStep ? 'Verify OTP Code' : 'Welcome to Wekelea'}
+                {isOtpStep ? 'Verify OTP Code' : 'Welcome to haddy'}
               </h2>
               <p className="text-xs text-gray-400">
                 {isOtpStep 
@@ -992,11 +992,11 @@ export default function WekeleaApp() {
                   title: 'Terms of Service',
                   icon: '📜',
                   body: [
-                    'Wekelea provides a peer-to-peer escrow facility only. We are not a party to, or a guarantor of, any agreement between users.',
+                    'haddy provides a peer-to-peer escrow facility only. We are not a party to, or a guarantor of, any agreement between users.',
                     'Users must be 18 years or older and legally permitted to enter binding agreements in their jurisdiction.',
                     'An agreement becomes active only when the participants have accepted the terms and funded the escrow. Funds are held in escrow until the conditions are verified or a dispute is resolved by an arbiter.',
                     'A 5% service fee is deducted from the escrow on release. No fee is charged on a full dispute refund.',
-                    'Agreements must be based on objective, verifiable conditions. Wekelea reserves the right to freeze or refund agreements that violate these terms.',
+                    'Agreements must be based on objective, verifiable conditions. haddy reserves the right to freeze or refund agreements that violate these terms.',
                   ],
                 },
                 privacy: {
@@ -1014,11 +1014,11 @@ export default function WekeleaApp() {
                   title: 'Responsible Use Policy',
                   icon: '⚖️',
                   body: [
-                    'Wekelea is infrastructure for enforcing agreements between consenting adults — not a gambling product. There are no odds, no house position, and no automated betting.',
+                    'haddy is infrastructure for enforcing agreements between consenting adults — not a gambling product. There are no odds, no house position, and no automated betting.',
                     'Only commit funds you are prepared to place in escrow. Escrowed funds are locked until conditions are verified and cannot be recalled unilaterally.',
                     'Agreements must reference clear, objective, verifiable conditions. Ambiguous or unverifiable terms may be refunded by an arbiter.',
                     'Harassment, coercion, or fraudulent release requests will result in account suspension and loss of standing.',
-                    'Use Wekelea responsibly. If a commitment feels beyond your means, do not fund it. Support resources are available on request.',
+                    'Use haddy responsibly. If a commitment feels beyond your means, do not fund it. Support resources are available on request.',
                   ],
                 },
               }[legalModal];
@@ -1027,7 +1027,7 @@ export default function WekeleaApp() {
                   <div className="text-center space-y-1 pt-1">
                     <span className="text-3xl">{content.icon}</span>
                     <h3 className="text-xl font-black text-white">{content.title}</h3>
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">Wekelea Escrow Platform · Nairobi, Kenya</p>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">haddy Escrow Platform · Nairobi, Kenya</p>
                   </div>
                   <div className="space-y-3 text-xs text-gray-300 leading-relaxed">
                     {content.body.map((para, i) => (
@@ -1588,7 +1588,7 @@ export default function WekeleaApp() {
                         <span>Arbitration Active</span>
                       </div>
                       <p className="text-[11px] text-gray-300 leading-normal">
-                        Release not approved. Escrow is frozen. A Wekelea admin is reviewing the evidence timeline. Restore ratings by sending verification links.
+                        Release not approved. Escrow is frozen. A haddy admin is reviewing the evidence timeline. Restore ratings by sending verification links.
                       </p>
                       
                       {currentUser.id === 'admin' && (
@@ -1608,7 +1608,7 @@ export default function WekeleaApp() {
                         <span>Escrow released!</span>
                       </div>
                       <p className="text-[10px] text-gray-400">
-                        Escrow of KES {selectedContract.totalEscrow.toLocaleString()} released to the receiving party. (Wekelea 5% service fee deducted).
+                        Escrow of KES {selectedContract.totalEscrow.toLocaleString()} released to the receiving party. (haddy 5% service fee deducted).
                       </p>
                     </div>
                   )}
@@ -1686,7 +1686,7 @@ export default function WekeleaApp() {
                     fgColor="#0d0d0f"
                     bgColor="#ffffff"
                     imageSettings={{
-                      src: '/assets/logo.png',
+                      src: '/assets/haddy-mark.svg',
                       height: 30,
                       width: 30,
                       excavate: true,
@@ -1701,7 +1701,7 @@ export default function WekeleaApp() {
                     <span>{copiedLink ? 'Copied to Clipboard!' : 'Copy Invitation Link'}</span>
                   </button>
 
-                  <a href={`https://wa.me/?text=${encodeURIComponent(`Join my escrow agreement on Wekelea: "${selectedContract.title}" with an escrow of KES ${selectedContract.escrowAmount}. Link: ${window.location.origin}/?contractId=${selectedContract.id}`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 px-4 rounded-xl transition flex items-center justify-center space-x-1.5 shadow active:scale-95 text-xs uppercase tracking-wider">
+                  <a href={`https://wa.me/?text=${encodeURIComponent(`Join my escrow agreement on haddy: "${selectedContract.title}" with an escrow of KES ${selectedContract.escrowAmount}. Link: ${window.location.origin}/?contractId=${selectedContract.id}`)}`} target="_blank" rel="noopener noreferrer" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 px-4 rounded-xl transition flex items-center justify-center space-x-1.5 shadow active:scale-95 text-xs uppercase tracking-wider">
                     <span>📱 Share via WhatsApp</span>
                   </a>
                 </div>
@@ -1740,7 +1740,7 @@ export default function WekeleaApp() {
                   <div className="space-y-4">
                     <div className="bg-white p-3 rounded-lg border border-gray-300 text-xs space-y-1">
                       <p className="text-gray-500 font-semibold uppercase tracking-wider text-[9px]">Lipa Na M-Pesa Online</p>
-                      <p className="text-gray-800 font-medium">Pay Bill: <span className="font-bold text-black">WEKELEA ESCROW</span></p>
+                      <p className="text-gray-800 font-medium">Pay Bill: <span className="font-bold text-black">HADDY ESCROW</span></p>
                       <p className="text-gray-800 font-medium">Amount: <span className="font-extrabold text-emerald-600">KES {mpesaAmount.toLocaleString()}</span></p>
                       <p className="text-gray-800 font-medium">Phone: <span className="font-bold text-black">+{mpesaPhone}</span></p>
                     </div>

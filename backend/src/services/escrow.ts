@@ -127,7 +127,7 @@ export class EscrowService {
           id: 'n_' + Math.random().toString(36).substring(2, 12),
           userId: pId,
           title: 'Escrow Vault Active! 🔒',
-          message: `Both parties have funded "${contract.title}". KES ${contract.totalPot} is now secured in Wekelea escrow. Settle arguments instantly!`,
+          message: `Both parties have funded "${contract.title}". KES ${contract.totalPot} is now secured in haddy escrow. Settle arguments instantly!`,
           contractId,
           type: 'CONTRACT_ACTIVE',
           read: false,
@@ -265,7 +265,7 @@ export class EscrowService {
       type: 'FEE',
       status: 'SUCCESS',
       reference: `FEE_${contractId.substring(2)}`,
-      description: `Wekelea 5% fee for contract "${contract.title}"`,
+      description: `haddy 5% fee for contract "${contract.title}"`,
       createdAt: new Date().toISOString()
     });
 
@@ -437,7 +437,7 @@ export class EscrowService {
       type: 'FEE',
       status: 'SUCCESS',
       reference: `ADMIN_FEE_${contract.id.substring(2)}`,
-      description: `Wekelea admin resolution fee for contract "${contract.title}"`,
+      description: `haddy admin resolution fee for contract "${contract.title}"`,
       createdAt: new Date().toISOString()
     });
 

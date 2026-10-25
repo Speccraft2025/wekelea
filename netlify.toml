@@ -1,4 +1,4 @@
-# Netlify config for the Wekelea monorepo.
+# Netlify config for the haddy product (legacy wekelea monorepo identifiers retained).
 # The deployable app is the Next.js project in frontend/ (frontend + API routes).
 [build]
   base = "frontend"

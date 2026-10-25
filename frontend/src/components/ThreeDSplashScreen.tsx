@@ -9,7 +9,7 @@ interface ThreeDSplashScreenProps {
 /**
  * Lightweight brand splash. Previously this rendered a 16 MB 3D model via
  * Three.js (which failed to fetch and made loading janky); it's now a smooth
- * CSS/image intro using the existing logo — no WebGL, no heavy assets.
+ * CSS/image intro using the lightweight haddy promise mark — no WebGL or heavy assets.
  */
 export default function ThreeDSplashScreen({ onComplete }: ThreeDSplashScreenProps) {
   const [leaving, setLeaving] = useState(false);
@@ -35,18 +35,18 @@ export default function ThreeDSplashScreen({ onComplete }: ThreeDSplashScreenPro
       <div className="flex flex-col items-center text-center space-y-5 z-10">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/assets/logo.png"
-          alt="Wekelea"
+          src="/assets/haddy-mark.svg"
+          alt="haddy promise mark"
           className="w-24 h-24 object-contain drop-shadow-[0_0_25px_rgba(236,117,5,0.45)] wk-logo-in"
         />
 
         <div className="flex flex-col items-center space-y-1.5">
-          <h2 className="text-3xl font-black uppercase tracking-widest text-white">Wekelea</h2>
+          <h2 className="text-3xl font-black tracking-wide text-white">haddy</h2>
           <div className="kenya-accent w-24 rounded" style={{ height: '3px' }} />
         </div>
 
         <p className="text-gray-400 text-[10px] tracking-wider uppercase font-extrabold">
-          Programmable Escrow for Agreements
+          Put your money where your mouth is.
         </p>
 
         {/* Smooth CSS-driven progress bar (purely cosmetic) */}
