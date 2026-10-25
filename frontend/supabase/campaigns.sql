@@ -34,6 +34,8 @@ create table campaigns (
   sponsor_id       text not null references users(id),
   title            text not null,
   brief            text not null default '',          -- full task description
+  asset_url        text not null default '',          -- streaming link to the promoted song/asset
+  content_type     text not null default '',          -- requested content type (e.g. Dance clip)
   category         text not null default 'Creative Work',
   platform         text not null default 'TikTok',     -- TikTok | Instagram | YouTube | X | Other
   requirements     text[] not null default '{}',       -- objective deliverable conditions

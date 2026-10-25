@@ -27,6 +27,30 @@ const grossPayout = (views: number, rate: number) => Math.round((rate * views) /
 const CAMPAIGN_FEE_RATE = 0.10;
 const creatorPool = (budget: number) => Math.round(budget * (1 - CAMPAIGN_FEE_RATE) * 100) / 100;
 
+// --- Brief-builder presets (local MVP: settle in KES, show USD for reference) ---
+const USD_KES = 129.92; // CBK reference rate, 21 Oct 2026 — display only
+const usd = (kesAmount: number) => '$' + Math.round((kesAmount || 0) / USD_KES).toLocaleString();
+const BUDGET_PRESETS = [2500, 5000, 10000, 25000, 50000];
+const RATE_PRESETS = [{ v: 260, label: 'Standard' }, { v: 350, label: 'Priority' }, { v: 500, label: 'Premium' }];
+const MINVIEW_PRESETS = [500, 1000, 2500, 5000];
+const CONTENT_TYPES = ['Dance clip', 'Lip-sync / POV', 'Snippet in background', 'Review / reaction', 'Choreography', 'Transition / edit', 'Any creative use'];
+const LIVE_DAYS = [14, 30, 60];
+const MUSIC_HOSTS: { d: string; label: string }[] = [
+  { d: 'spotify', label: 'Spotify' }, { d: 'music.apple', label: 'Apple Music' }, { d: 'apple.com', label: 'Apple Music' },
+  { d: 'music.youtube', label: 'YouTube Music' }, { d: 'youtube', label: 'YouTube' }, { d: 'youtu.be', label: 'YouTube' },
+  { d: 'soundcloud', label: 'SoundCloud' }, { d: 'audiomack', label: 'Audiomack' }, { d: 'boomplay', label: 'Boomplay' },
+  { d: 'deezer', label: 'Deezer' }, { d: 'tidal', label: 'Tidal' }, { d: 'distrokid', label: 'DistroKid' },
+  { d: 'ffm.to', label: 'Feature.fm' }, { d: 'songwhip', label: 'Songwhip' }, { d: 'linktr.ee', label: 'Linktree' },
+];
+function isHttpUrl(url: string): boolean {
+  try { const u = new URL(url.trim()); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; }
+}
+function detectMusicHost(url: string): string | null {
+  try { const h = new URL(url.trim()).hostname.replace(/^www\./, ''); return MUSIC_HOSTS.find((x) => h.includes(x.d))?.label ?? null; } catch { return null; }
+}
+const chipCls = (on: boolean) =>
+  `px-2 py-2 rounded-xl text-[11px] font-semibold border text-center leading-tight transition ${on ? 'bg-[#EC7505] text-black border-[#EC7505]' : 'bg-white/5 text-gray-300 border-white/10 hover:bg-white/10'}`;
+
 interface Props {
   currentUser: User;
   onBack: () => void;
@@ -355,6 +379,19 @@ function CampaignDetail({
 
         <p className="text-xs text-gray-300 leading-relaxed">{campaign.brief}</p>
 
+        {(campaign.assetUrl || campaign.contentType) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {campaign.assetUrl && (
+              <a href={campaign.assetUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center space-x-1 bg-[#EC7505]/15 text-[#EC7505] text-[11px] font-semibold px-2.5 py-1.5 rounded-lg hover:bg-[#EC7505]/25">
+                <span>🎵</span><span>Listen to the track</span><ExternalLink size={11} />
+              </a>
+            )}
+            {campaign.contentType && (
+              <span className="bg-white/5 text-gray-300 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg">{campaign.contentType}</span>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-2 text-center">
           <div className="bg-black/20 rounded-xl py-2 border border-white/5">
             <p className="text-sm font-black text-[#EC7505]">{kes(campaign.ratePer1000)}</p>
@@ -585,33 +622,79 @@ function ReviewRow({ s, canReview, rate, budgetRemaining = 0, busy, onApprove, o
 function CreateCampaign({ currentUser, onClose, onCreated }: {
   currentUser: User; onClose: () => void; onCreated: (c: Campaign) => void;
 }) {
+  const STEPS = ['Song', 'Budget', 'Targets', 'Rules'];
+  const [step, setStep] = useState(0);
+  // Step 1 — Song
+  const [assetUrl, setAssetUrl] = useState('');
   const [title, setTitle] = useState('');
   const [brief, setBrief] = useState('');
+  const [contentType, setContentType] = useState('');
   const [platform, setPlatform] = useState<CampaignPlatform>('TikTok');
-  const [category, setCategory] = useState<AgreementCategory>('Creative Work');
-  const [requirements, setRequirements] = useState<string[]>(['']);
-  const [rate, setRate] = useState('260');
-  const [budget, setBudget] = useState('5000');
-  const [minViews, setMinViews] = useState('1000');
+  // Step 2 — Budget
+  const [rate, setRate] = useState(260);
+  const [budget, setBudget] = useState(5000);
+  // Step 3 — Targets
+  const [minViews, setMinViews] = useState(1000);
   const [deadline, setDeadline] = useState('');
-  const [trustedSource, setTrustedSource] = useState('');
+  // Step 4 — Rules
+  const [tagHandle, setTagHandle] = useState('');
+  const [hashtag, setHashtag] = useState('');
+  const [liveDays, setLiveDays] = useState(30);
+  const [mustUseSound, setMustUseSound] = useState(true);
+  const [collabsAllowed, setCollabsAllowed] = useState(false);
+  const [extra, setExtra] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const setReq = (i: number, v: string) => setRequirements((r) => r.map((x, j) => (j === i ? v : x)));
-  const addReq = () => setRequirements((r) => [...r, '']);
-  const rmReq = (i: number) => setRequirements((r) => r.filter((_, j) => j !== i));
+  const host = assetUrl ? detectMusicHost(assetUrl) : null;
+  const urlOk = isHttpUrl(assetUrl);
+  const budgetNum = Number(budget) || 0;
+  const pool = creatorPool(budgetNum);
+  const fee = Math.round((budgetNum - pool) * 100) / 100;
+  const tierPayout = grossPayout(Math.max(minViews, 1000), rate);
+  const maxViews = rate > 0 ? Math.floor((pool / rate) * 1000) : 0;
+  const poolCoversTier = pool >= tierPayout && pool >= rate;
+  const deadlineOk = !!deadline && new Date(`${deadline}T23:59:59`) > new Date();
+  const todayISO = new Date().toISOString().split('T')[0];
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const stepValid = [
+    urlOk && title.trim().length >= 4 && brief.trim().length >= 15 && contentType !== '',
+    budgetNum > 0 && rate > 0 && poolCoversTier,
+    minViews >= 0 && deadlineOk,
+    true,
+  ];
+  const allValid = stepValid.every(Boolean);
+
+  const compiledReqs = ([
+    mustUseSound ? 'Use the official sound from the linked track.' : null,
+    tagHandle.trim() ? `Tag ${tagHandle.trim().startsWith('@') ? tagHandle.trim() : '@' + tagHandle.trim()} in the post.` : null,
+    hashtag.trim() ? `Include ${hashtag.trim().startsWith('#') ? hashtag.trim() : '#' + hashtag.trim()}.` : null,
+    `Keep the post public for at least ${liveDays} days.`,
+    collabsAllowed ? 'Collaborations with other creators are allowed.' : 'Solo posts only — no collaborations.',
+    '1 post per creator.',
+    ...extra.map((s) => s.trim()).filter(Boolean),
+  ].filter(Boolean)) as string[];
+
+  const setExtraAt = (i: number, v: string) => setExtra((r) => r.map((x, j) => (j === i ? v : x)));
+
+  const submit = async () => {
+    if (!allValid) { setError('Please complete every step correctly before creating the brief.'); return; }
     setBusy(true); setError(null);
     try {
       const c = await WekeleaAPI.createCampaign({
-        sponsorId: currentUser.id, title, brief, platform, category,
-        requirements: requirements.map((r) => r.trim()).filter(Boolean),
-        ratePer1000: Number(rate), budget: Number(budget), minViews: Number(minViews),
-        deadline: deadline ? new Date(`${deadline}T23:59:59`).toISOString() : undefined,
-        trustedSource: trustedSource.trim() || undefined,
+        sponsorId: currentUser.id,
+        title: title.trim(),
+        brief: brief.trim(),
+        assetUrl: assetUrl.trim(),
+        contentType,
+        platform,
+        category: 'Creative Work',
+        requirements: compiledReqs,
+        ratePer1000: rate,
+        budget: budgetNum,
+        minViews,
+        deadline: new Date(`${deadline}T23:59:59`).toISOString(),
+        trustedSource: `${platform} post analytics screenshot`,
       });
       onCreated(c);
     } catch (err: any) {
@@ -625,90 +708,177 @@ function CreateCampaign({ currentUser, onClose, onCreated }: {
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={onClose}>
       <div className="glass-premium p-6 w-full max-w-md max-h-[88vh] overflow-y-auto rounded-3xl border-white/10 shadow-2xl space-y-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-black text-white flex items-center space-x-2"><span>📣</span><span>New Campaign</span></h3>
+          <h3 className="text-lg font-black text-white flex items-center space-x-2"><span>📣</span><span>New brief</span></h3>
           <button onClick={onClose} className="text-gray-400 hover:text-white"><X size={20} /></button>
         </div>
 
+        <div className="flex gap-1.5">
+          {STEPS.map((s, i) => (
+            <div key={s} className={`flex-1 h-1.5 rounded-full transition ${i < step ? 'bg-emerald-500' : i === step ? 'bg-[#EC7505]' : 'bg-white/10'}`} />
+          ))}
+        </div>
+        <p className="text-[10px] text-gray-400 -mt-2">Step {step + 1} of 4 · <span className="text-gray-200 font-semibold">{STEPS[step]}</span></p>
+
         {error && <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs p-3 rounded-xl">{error}</div>}
 
-        <form onSubmit={submit} className="space-y-3">
-          <div>
-            <label className="text-[10px] font-semibold text-gray-400 block mb-1">Campaign title *</label>
-            <input value={title} onChange={(e) => setTitle(e.target.value)} required placeholder="Use 30s of my chorus on TikTok" className="input-field text-xs" />
-          </div>
-          <div>
-            <label className="text-[10px] font-semibold text-gray-400 block mb-1">Brief *</label>
-            <textarea value={brief} onChange={(e) => setBrief(e.target.value)} required rows={3} placeholder="What should creators make? Include the sound, hook, tags, mentions and must-haves." className="input-field text-xs resize-none" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] font-semibold text-gray-400 block mb-1">Platform</label>
-              <select value={platform} onChange={(e) => setPlatform(e.target.value as CampaignPlatform)} className="input-field text-xs">
-                {PLATFORMS.map((p) => <option key={p.key} value={p.key}>{p.emoji} {p.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold text-gray-400 block mb-1">Category</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value as AgreementCategory)} className="input-field text-xs">
-                {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] font-semibold text-gray-400 block mb-1">Rate per 1,000 views (KES) *</label>
-              <input value={rate} onChange={(e) => setRate(e.target.value)} type="number" min={1} required className="input-field text-xs" />
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold text-gray-400 block mb-1">Total budget (KES) *</label>
-              <input value={budget} onChange={(e) => setBudget(e.target.value)} type="number" min={1} required className="input-field text-xs" />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] font-semibold text-gray-400 block mb-1">Minimum views to qualify</label>
-            <input value={minViews} onChange={(e) => setMinViews(e.target.value)} type="number" min={0} className="input-field text-xs" />
-          </div>
-
-          <div>
-            <label className="text-[10px] font-semibold text-gray-400 block mb-1">Application deadline *</label>
-            <input value={deadline} onChange={(e) => setDeadline(e.target.value)} type="date" required className="input-field text-xs" />
-          </div>
-
-          <div>
-            <label className="text-[10px] font-semibold text-gray-400 block mb-1">Deliverable requirements *</label>
-            <div className="space-y-2">
-              {requirements.map((r, i) => (
-                <div key={i} className="flex space-x-2">
-                  <input value={r} onChange={(e) => setReq(i, e.target.value)} placeholder={`Requirement ${i + 1}`} className="input-field text-xs flex-1" />
-                  {requirements.length > 1 && (
-                    <button type="button" onClick={() => rmReq(i)} className="px-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400"><X size={14} /></button>
-                  )}
+        <div className="space-y-3">
+          {step === 0 && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Streaming link to the song *</label>
+                <input value={assetUrl} onChange={(e) => setAssetUrl(e.target.value)} placeholder="https://open.spotify.com/track/…" className="input-field text-xs" />
+                {assetUrl && (host ? (
+                  <p className="text-[10px] text-emerald-400 mt-1 flex items-center space-x-1"><Check size={11} /><span>{host} link detected</span></p>
+                ) : urlOk ? (
+                  <p className="text-[10px] text-amber-400 mt-1 flex items-start space-x-1"><AlertTriangle size={11} className="mt-0.5 flex-shrink-0" /><span>Not a known streaming host — double-check this links to your song.</span></p>
+                ) : (
+                  <p className="text-[10px] text-rose-400 mt-1">Paste a full link starting with https://</p>
+                ))}
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Campaign title *</label>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Clip my new single “Midnight”" className="input-field text-xs" />
+                {title.trim() !== '' && title.trim().length < 4 && <p className="text-[10px] text-rose-400 mt-1">Give it a clearer title (4+ characters).</p>}
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Describe the song &amp; the content you want *</label>
+                <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={3} placeholder="The vibe of the track, the hook to use, and what creators should make." className="input-field text-xs resize-none" />
+                {brief.trim() !== '' && brief.trim().length < 15 && <p className="text-[10px] text-rose-400 mt-1">Add a little more detail (15+ characters).</p>}
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Content type *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {CONTENT_TYPES.map((ct) => (
+                    <button type="button" key={ct} onClick={() => setContentType(ct)} className={chipCls(contentType === ct)}>{ct}</button>
+                  ))}
                 </div>
-              ))}
-              <button type="button" onClick={addReq} className="text-[11px] font-bold text-[#EC7505] hover:underline flex items-center space-x-1"><Plus size={12} /><span>Add requirement</span></button>
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Platform</label>
+                <div className="grid grid-cols-5 gap-2">
+                  {PLATFORMS.map((p) => (
+                    <button type="button" key={p.key} onClick={() => setPlatform(p.key)} className={chipCls(platform === p.key)} title={p.label}><span className="text-base">{p.emoji}</span></button>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div>
-            <label className="text-[10px] font-semibold text-gray-400 block mb-1">How are views verified? (optional)</label>
-            <input value={trustedSource} onChange={(e) => setTrustedSource(e.target.value)} placeholder="e.g. TikTok analytics screenshot" className="input-field text-xs" />
-          </div>
-
-          <div className="bg-black/20 rounded-xl p-3 border border-white/5 text-[11px] text-gray-400 space-y-2">
-            <div className="flex items-start space-x-2">
-            <Globe size={13} className="text-[#EC7505] mt-0.5 flex-shrink-0" />
-            <span>After creating, you&apos;ll lock <strong className="text-white">{kes(Number(budget) || 0)}</strong>. Applications are free; only selected creators can submit work.</span>
+          {step === 1 && (
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Rate per 1,000 verified views</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {RATE_PRESETS.map((r) => (
+                    <button type="button" key={r.v} onClick={() => setRate(r.v)} className={chipCls(rate === r.v)}>{r.label}<br /><span className="text-[10px] opacity-80">KES {r.v}</span></button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Campaign budget (locked in escrow)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {BUDGET_PRESETS.map((b) => (
+                    <button type="button" key={b} onClick={() => setBudget(b)} className={chipCls(budgetNum === b)}>KES {b.toLocaleString()}<br /><span className="text-[10px] opacity-80">≈ {usd(b)}</span></button>
+                  ))}
+                </div>
+                <input value={budget} onChange={(e) => setBudget(Number(e.target.value))} type="number" min={1} placeholder="Custom amount (KES)" className="input-field text-xs mt-2" />
+              </div>
+              <div className="bg-black/20 rounded-xl p-3 border border-white/5 text-[11px] space-y-1.5">
+                <div className="flex justify-between text-gray-300"><span>Creator pool (90%)</span><strong className="text-white">{kes(pool)}</strong></div>
+                <div className="flex justify-between text-gray-400"><span>haddy fee (10%)</span><strong className="text-gray-200">{kes(fee)}</strong></div>
+                <div className="flex justify-between text-emerald-400 pt-1.5 border-t border-white/5"><span>Buys up to</span><strong>{maxViews.toLocaleString()} views</strong></div>
+              </div>
+              {budgetNum > 0 && !poolCoversTier && (
+                <p className="text-[10px] text-rose-400 flex items-start space-x-1"><AlertTriangle size={11} className="mt-0.5 flex-shrink-0" /><span>Budget is too low — after the 10% fee the creator pool must cover at least one {kes(rate)} payout. Raise the budget or lower the rate.</span></p>
+              )}
             </div>
-            <p className="pl-5 text-[10px] text-gray-500"><strong className="text-gray-300">{kes(creatorPool(Number(budget) || 0))}</strong> is the creator pool; <strong className="text-gray-300">{kes((Number(budget) || 0) - creatorPool(Number(budget) || 0))}</strong> is haddy&apos;s 10% campaign fee. At {kes(Number(rate) || 0)} per 1,000 verified views, creators can earn up to <strong className="text-gray-300">{Math.floor(creatorPool(Number(budget) || 0) / Math.max(1, Number(rate) || 1)).toLocaleString()} full 1k-view tiers</strong>.</p>
-          </div>
+          )}
 
-          <button type="submit" disabled={busy} className="w-full bg-[#EC7505] hover:bg-[#D84A05] disabled:opacity-50 text-black font-black py-3 rounded-xl text-xs uppercase tracking-wider active:scale-95">
-            {busy ? 'Creating…' : 'Create Campaign'}
-          </button>
-        </form>
+          {step === 2 && (
+            <div className="space-y-3">
+              <div className="bg-gradient-to-br from-[#EC7505]/15 to-transparent border border-[#EC7505]/20 rounded-xl p-4 text-center">
+                <p className="text-[10px] text-gray-400 uppercase tracking-wide">Your budget targets up to</p>
+                <p className="text-2xl font-black text-white leading-tight">{maxViews.toLocaleString()} <span className="text-sm font-semibold text-gray-300">views</span></p>
+                <p className="text-[10px] text-gray-500">at {kes(rate)} per 1,000 verified views</p>
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Minimum views for a post to earn</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {MINVIEW_PRESETS.map((v) => (
+                    <button type="button" key={v} onClick={() => setMinViews(v)} className={chipCls(minViews === v)}>{v.toLocaleString()}</button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1">Posts below this don&apos;t qualify — it keeps out low-effort clips.</p>
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Application deadline *</label>
+                <input value={deadline} min={todayISO} onChange={(e) => setDeadline(e.target.value)} type="date" className="input-field text-xs" />
+                {deadline && !deadlineOk && <p className="text-[10px] text-rose-400 mt-1">Pick a future date.</p>}
+              </div>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-400 block mb-1">Tag / mention</label>
+                  <input value={tagHandle} onChange={(e) => setTagHandle(e.target.value)} placeholder="@yourname" className="input-field text-xs" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-gray-400 block mb-1">Hashtag</label>
+                  <input value={hashtag} onChange={(e) => setHashtag(e.target.value)} placeholder="#MidnightChallenge" className="input-field text-xs" />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Keep post public for</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {LIVE_DAYS.map((d) => (
+                    <button type="button" key={d} onClick={() => setLiveDays(d)} className={chipCls(liveDays === d)}>{d} days</button>
+                  ))}
+                </div>
+              </div>
+              <button type="button" onClick={() => setMustUseSound((v) => !v)} className="w-full flex items-center justify-between bg-white/5 rounded-xl px-3 py-2.5 text-xs text-gray-200">
+                <span>Must use the official sound</span>
+                <span className={`w-9 h-5 rounded-full relative transition flex-shrink-0 ${mustUseSound ? 'bg-emerald-500' : 'bg-white/15'}`}><span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${mustUseSound ? 'left-4' : 'left-0.5'}`} /></span>
+              </button>
+              <button type="button" onClick={() => setCollabsAllowed((v) => !v)} className="w-full flex items-center justify-between bg-white/5 rounded-xl px-3 py-2.5 text-xs text-gray-200">
+                <span>Allow collaborations</span>
+                <span className={`w-9 h-5 rounded-full relative transition flex-shrink-0 ${collabsAllowed ? 'bg-emerald-500' : 'bg-white/15'}`}><span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${collabsAllowed ? 'left-4' : 'left-0.5'}`} /></span>
+              </button>
+              <p className="text-[10px] text-gray-500">Each creator may submit 1 post per campaign.</p>
+              <div>
+                <label className="text-[10px] font-semibold text-gray-400 block mb-1">Extra requirements (optional)</label>
+                <div className="space-y-2">
+                  {extra.map((r, i) => (
+                    <div key={i} className="flex space-x-2">
+                      <input value={r} onChange={(e) => setExtraAt(i, e.target.value)} placeholder={`Requirement ${i + 1}`} className="input-field text-xs flex-1" />
+                      <button type="button" onClick={() => setExtra((x) => x.filter((_, j) => j !== i))} className="px-2 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400"><X size={14} /></button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setExtra((x) => [...x, ''])} className="text-[11px] font-bold text-[#EC7505] hover:underline flex items-center space-x-1"><Plus size={12} /><span>Add requirement</span></button>
+                </div>
+              </div>
+              <div className="bg-black/20 rounded-xl p-3 border border-white/5 text-[11px] text-gray-400 space-y-1">
+                <p className="font-semibold text-gray-300">Creators will see these rules:</p>
+                {compiledReqs.map((r, i) => <p key={i} className="flex items-start space-x-1"><Check size={11} className="text-emerald-400 mt-0.5 flex-shrink-0" /><span>{r}</span></p>)}
+              </div>
+              <div className="bg-black/20 rounded-xl p-3 border border-white/5 text-[11px] text-gray-400 flex items-start space-x-2">
+                <Lock size={13} className="text-[#EC7505] mt-0.5 flex-shrink-0" />
+                <span>On create you lock <strong className="text-white">{kes(budgetNum)}</strong> — <strong className="text-gray-200">{kes(pool)}</strong> creator pool + <strong className="text-gray-200">{kes(fee)}</strong> haddy fee. Applications are free; only selected creators submit work.</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-1">
+            <button type="button" onClick={() => (step === 0 ? onClose() : setStep((s) => s - 1))} className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-bold">{step === 0 ? 'Cancel' : 'Back'}</button>
+            {step < 3 ? (
+              <button type="button" disabled={!stepValid[step]} onClick={() => setStep((s) => s + 1)} className="px-6 py-2.5 rounded-xl bg-[#EC7505] hover:bg-[#D84A05] disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-black uppercase tracking-wider active:scale-95">Next</button>
+            ) : (
+              <button type="button" disabled={busy || !allValid} onClick={submit} className="px-6 py-2.5 rounded-xl bg-[#EC7505] hover:bg-[#D84A05] disabled:opacity-40 disabled:cursor-not-allowed text-black text-xs font-black uppercase tracking-wider active:scale-95">{busy ? 'Creating…' : 'Create brief'}</button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

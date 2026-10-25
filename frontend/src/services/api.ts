@@ -100,6 +100,8 @@ export interface Campaign {
   sponsorId: string;
   title: string;
   brief: string;
+  assetUrl: string;        // streaming link to the promoted song/asset
+  contentType: string;     // requested content type (e.g. Dance clip)
   category: AgreementCategory;
   platform: CampaignPlatform;
   requirements: string[];

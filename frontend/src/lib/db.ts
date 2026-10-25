@@ -97,6 +97,8 @@ export function rowToCampaign(r: any): Campaign {
     sponsorId: r.sponsor_id,
     title: r.title,
     brief: r.brief ?? '',
+    assetUrl: r.asset_url ?? '',
+    contentType: r.content_type ?? '',
     category: r.category as AgreementCategory,
     platform: r.platform as CampaignPlatform,
     requirements: r.requirements ?? [],
@@ -329,7 +331,8 @@ export async function getSubmissions(opts: { campaignId?: string; creatorId?: st
 
 export async function insertCampaign(c: Campaign): Promise<Campaign> {
   const { data, error } = await supabaseAdmin().from('campaigns').insert({
-    id: c.id, sponsor_id: c.sponsorId, title: c.title, brief: c.brief, category: c.category,
+    id: c.id, sponsor_id: c.sponsorId, title: c.title, brief: c.brief,
+    asset_url: c.assetUrl ?? '', content_type: c.contentType ?? '', category: c.category,
     platform: c.platform, requirements: c.requirements, rate_per_1000: c.ratePer1000,
     min_views: c.minViews, budget: c.budget, budget_remaining: 0, status: 'AWAITING_FUNDING',
     deadline: c.deadline, trusted_source: c.trustedSource ?? null, privacy: c.privacy,
