@@ -22,13 +22,16 @@ import {
   Clock, 
   Award, 
   Lock, 
-  Globe, 
+  Globe,
   RefreshCw,
   Sliders,
   Scale,
-  Trash2
+  Trash2,
+  Film,
+  Eye,
+  Zap
 } from 'lucide-react';
-import { WekeleaAPI, User, Contract, Dispute, Transaction, Notification, AgreementCategory, PrivacySetting } from '../services/api';
+import { WekeleaAPI, User, Contract, Dispute, Transaction, Notification, AgreementCategory, PrivacySetting, PublicStats, Campaign } from '../services/api';
 import { supabaseBrowser } from '../lib/supabaseBrowser';
 import dynamic from 'next/dynamic';
 import { QRCodeSVG } from 'qrcode.react';
@@ -97,6 +100,11 @@ export default function WekeleaApp() {
 
   const [isConnected, setIsConnected] = useState(false);
 
+  // Live public counters (landing page) — drive the live "posts" counters.
+  const [stats, setStats] = useState<PublicStats | null>(null);
+  const [liveConnected, setLiveConnected] = useState(false);
+  const [publicCampaigns, setPublicCampaigns] = useState<Campaign[]>([]);
+
   // Demo Assist states
   const [demoSelectedRole, setDemoSelectedRole] = useState<'creator' | 'counterparty'>('creator');
   const [notificationBanner, setNotificationBanner] = useState<{ title: string; message: string } | null>(null);
@@ -125,6 +133,46 @@ export default function WekeleaApp() {
       // Not logged in but arriving via an invite link — prompt sign-in
       setShowLoginModal(true);
     }
+  }, []);
+
+  // Live public counters — always on, even logged out. Fetches aggregate stats
+  // + the public campaign feed, then re-fetches on every Supabase Realtime change
+  // to campaigns/submissions so the "posts" counters tick live. Polls as backup.
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const [s, c] = await Promise.all([
+          WekeleaAPI.getStats(),
+          WekeleaAPI.getCampaigns(),
+        ]);
+        if (!active) return;
+        setStats(s);
+        setPublicCampaigns(c);
+      } catch (e) {
+        // transient — the poll below will retry
+      }
+    };
+
+    load();
+    const poll = setInterval(load, 15000);
+
+    const supabase = supabaseBrowser();
+    const channel = supabase
+      ? supabase
+          .channel('haddy-public-stats')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'campaigns' }, load)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'campaign_submissions' }, load)
+          .subscribe((status: string) => {
+            if (active) setLiveConnected(status === 'SUBSCRIBED');
+          })
+      : null;
+
+    return () => {
+      active = false;
+      clearInterval(poll);
+      if (supabase && channel) supabase.removeChannel(channel);
+    };
   }, []);
 
   // Resolve a pending deep-linked contract once the user is authenticated
@@ -786,6 +834,35 @@ export default function WekeleaApp() {
             </button>
           </div>
 
+          {/* Live Counters — realtime activity across haddy */}
+          <div className="px-2">
+            <div className="flex items-center justify-between mb-2.5 px-1">
+              <h3 className="font-extrabold text-white text-sm flex items-center space-x-1.5">
+                <Zap size={15} className="text-[#EC7505]" />
+                <span>Live on haddy</span>
+              </h3>
+              <span className={`flex items-center space-x-1 text-[10px] font-bold uppercase tracking-wider ${liveConnected ? 'text-emerald-400' : 'text-amber-400'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${liveConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span>{liveConnected ? 'Live' : 'Syncing'}</span>
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { icon: <Film size={16} />, label: 'Posts submitted', value: (stats?.posts ?? 0).toLocaleString(), hint: `${stats?.liveCreators ?? 0} creators` },
+                { icon: <TrendingUp size={16} />, label: 'Active campaigns', value: (stats?.activeCampaigns ?? 0).toLocaleString(), hint: `${stats?.openCampaigns ?? 0} awaiting funding` },
+                { icon: <Wallet size={16} />, label: 'In escrow', value: `KES ${(stats?.escrowLocked ?? 0).toLocaleString()}`, hint: `KES ${(stats?.paidOut ?? 0).toLocaleString()} paid out` },
+                { icon: <Eye size={16} />, label: 'Verified views', value: new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(stats?.viewsVerified ?? 0), hint: 'across all posts' },
+              ].map((s, i) => (
+                <div key={i} className="glass p-4 rounded-2xl border-white/5 flex flex-col space-y-1">
+                  <span className="text-[#EC7505]">{s.icon}</span>
+                  <span className="text-2xl font-black text-white tabular-nums leading-none pt-1 transition-all">{s.value}</span>
+                  <span className="text-[11px] text-gray-300 font-semibold leading-tight">{s.label}</span>
+                  <span className="text-[10px] text-gray-500 leading-tight">{s.hint}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Product Principles Grid */}
           <div className="grid grid-cols-2 gap-4 px-2 pt-4">
             <div className="glass p-4 rounded-2xl flex flex-col space-y-2 border-white/5">
@@ -827,40 +904,37 @@ export default function WekeleaApp() {
             </p>
 
             {(() => {
-              const openAgreements = contracts
-                .filter((c) => c.privacy === 'Public' && ['DRAFT', 'AWAITING_ACCEPTANCE', 'AWAITING_FUNDING'].includes(c.status))
+              const openCampaigns = publicCampaigns
+                .filter((c) => ['ACTIVE', 'AWAITING_FUNDING'].includes(c.status))
                 .slice(0, 5);
 
-              if (openAgreements.length === 0) {
+              if (openCampaigns.length === 0) {
                 return (
                   <div className="bg-black/20 rounded-xl p-6 text-center border border-white/5">
                     <span className="text-2xl block mb-1">🕊️</span>
-                    <p className="text-[11px] text-gray-500">No public campaign data is shown here. Launch the app to create or browse campaigns.</p>
+                    <p className="text-[11px] text-gray-500">No open campaigns right now. Launch the app to create one or be the first creator to apply.</p>
                   </div>
                 );
               }
 
               return (
                 <div className="space-y-2">
-                  {openAgreements.map((c) => (
+                  {openCampaigns.map((c) => (
                     <button
                       key={c.id}
-                      onClick={() => {
-                        setPendingContractId(c.id);
-                        setShowLoginModal(true);
-                      }}
+                      onClick={() => setShowLoginModal(true)}
                       className="w-full bg-black/20 hover:bg-white/5 rounded-xl p-3 border border-white/5 flex items-center justify-between text-left transition active:scale-[0.99]"
                     >
                       <div className="flex items-center space-x-2.5 min-w-0">
                         <span className="text-lg flex-shrink-0">{getCategoryIcon(c.category)}</span>
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-white truncate">{c.title}</p>
-                          <p className="text-[10px] text-gray-500">{c.category} · escrow KES {c.escrowAmount.toLocaleString()}</p>
+                          <p className="text-[10px] text-gray-500">{c.platform} · KES {c.ratePer1000.toLocaleString()}/1k views{c.status === 'AWAITING_FUNDING' ? ' · awaiting funding' : ''}</p>
                         </div>
                       </div>
                       <div className="flex flex-col items-end flex-shrink-0 pl-2">
-                        <span className="text-[11px] font-black text-[#EC7505]">KES {c.totalEscrow.toLocaleString()}</span>
-                        <span className="text-[9px] text-gray-500 uppercase">in escrow</span>
+                        <span className="text-[11px] font-black text-[#EC7505]">KES {(c.status === 'ACTIVE' ? c.budgetRemaining : c.budget).toLocaleString()}</span>
+                        <span className="text-[9px] text-gray-500 uppercase">{c.status === 'ACTIVE' ? 'escrow left' : 'budget'}</span>
                       </div>
                     </button>
                   ))}

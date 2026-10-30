@@ -329,6 +329,51 @@ export async function getSubmissions(opts: { campaignId?: string; creatorId?: st
   return (data ?? []).map(rowToSubmission);
 }
 
+export interface PublicStats {
+  activeCampaigns: number;   // funded campaigns currently open to creators
+  openCampaigns: number;     // campaigns awaiting funding
+  totalCampaigns: number;    // all public campaigns
+  posts: number;             // total creator submissions ("posts")
+  liveCreators: number;      // distinct creators who have posted
+  escrowLocked: number;      // KES still locked in active campaign escrow
+  viewsVerified: number;     // total verified views across posts
+  paidOut: number;           // KES released to creators so far
+}
+
+/**
+ * Live public counters for the landing page. Reads only public campaigns and
+ * their submissions, aggregated server-side. Cheap at MVP volumes; the landing
+ * refreshes this on every Supabase Realtime change to campaigns/submissions.
+ */
+export async function getPublicStats(): Promise<PublicStats> {
+  const sb = supabaseAdmin();
+  const [campaignsRes, subsRes] = await Promise.all([
+    sb.from('campaigns').select('status,budget,budget_remaining,privacy').neq('privacy', 'Private'),
+    sb.from('campaign_submissions').select('creator_id,verified_views,payout_amount,status'),
+  ]);
+  fail('getPublicStats:campaigns', campaignsRes.error);
+  fail('getPublicStats:submissions', subsRes.error);
+
+  const campaigns = campaignsRes.data ?? [];
+  const subs = subsRes.data ?? [];
+  const active = campaigns.filter((c: any) => c.status === 'ACTIVE');
+  const open = campaigns.filter((c: any) => c.status === 'AWAITING_FUNDING');
+  const creators = new Set(subs.map((s: any) => s.creator_id));
+
+  return {
+    activeCampaigns: active.length,
+    openCampaigns: open.length,
+    totalCampaigns: campaigns.length,
+    posts: subs.length,
+    liveCreators: creators.size,
+    escrowLocked: active.reduce((sum: number, c: any) => sum + num(c.budget_remaining), 0),
+    viewsVerified: subs.reduce((sum: number, s: any) => sum + num(s.verified_views), 0),
+    paidOut: subs
+      .filter((s: any) => s.status === 'APPROVED')
+      .reduce((sum: number, s: any) => sum + num(s.payout_amount), 0),
+  };
+}
+
 export async function insertCampaign(c: Campaign): Promise<Campaign> {
   const { data, error } = await supabaseAdmin().from('campaigns').insert({
     id: c.id, sponsor_id: c.sponsorId, title: c.title, brief: c.brief,

@@ -89,6 +89,18 @@ export interface Notification {
   createdAt: string;
 }
 
+// --- Live public counters (landing page) ------------------------------------
+export interface PublicStats {
+  activeCampaigns: number;
+  openCampaigns: number;
+  totalCampaigns: number;
+  posts: number;
+  liveCreators: number;
+  escrowLocked: number;
+  viewsVerified: number;
+  paidOut: number;
+}
+
 // --- One-to-Many: Campaigns (creator economy) -------------------------------
 
 export type CampaignStatus = 'AWAITING_FUNDING' | 'ACTIVE' | 'CLOSED';
@@ -295,6 +307,11 @@ export class WekeleaAPI {
       method: 'POST',
       body: JSON.stringify({ notes })
     });
+  }
+
+  // --- Live public counters (landing page) ---
+  static async getStats(): Promise<PublicStats> {
+    return this.request<PublicStats>('/stats');
   }
 
   // --- Campaigns (One-to-Many) ---
